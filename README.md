@@ -23,25 +23,24 @@ A comprehensive Node.js tool for working with MAVLink protocols, providing both 
 
 ### From GitHub Packages
 
-First, configure npm to use GitHub Packages for the `@pavliha` scope:
-
-```bash
-# Create/update .npmrc in your project
-echo "@pavliha:registry=https://npm.pkg.github.com" >> .npmrc
-echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN" >> .npmrc
-```
-
-Then install the package:
+Since this is a public repository, you can install the package directly without authentication:
 
 ```bash
 # Global installation
-npm install -g @pavliha/aircast-mavlink
+npm install -g @pavliha/aircast-mavlink --registry=https://npm.pkg.github.com
 
-# Local installation
-npm install @pavliha/aircast-mavlink
+# Local installation  
+npm install @pavliha/aircast-mavlink --registry=https://npm.pkg.github.com
 ```
 
-**Note**: Replace `YOUR_GITHUB_TOKEN` with a GitHub Personal Access Token that has `read:packages` scope.
+**Alternative: Configure npm scope (one-time setup)**
+```bash
+# Configure npm to use GitHub Packages for @pavliha scope
+npm config set @pavliha:registry https://npm.pkg.github.com
+
+# Then install normally
+npm install @pavliha/aircast-mavlink
+```
 
 ### Global Installation (Alternative)
 

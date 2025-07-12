@@ -36,19 +36,29 @@ Trigger manual publishing via GitHub Actions:
 
 ### For Users Installing the Package
 
-#### 1. Create/Update `.npmrc`
+Since this is a **public repository**, no authentication is required for installation.
+
+#### Option 1: Direct Installation
+```bash
+npm install @pavliha/aircast-mavlink --registry=https://npm.pkg.github.com
+```
+
+#### Option 2: Configure npm scope (recommended)
+```bash
+# One-time setup: configure npm to use GitHub Packages for @pavliha scope
+npm config set @pavliha:registry https://npm.pkg.github.com
+
+# Then install normally
+npm install @pavliha/aircast-mavlink
+```
+
+#### Option 3: Project-specific .npmrc
 Create a `.npmrc` file in your project root:
 ```
 @pavliha:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
 ```
 
-#### 2. Generate GitHub Token
-1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-2. Generate new token with `read:packages` scope
-3. Replace `YOUR_GITHUB_TOKEN` in `.npmrc` with the generated token
-
-#### 3. Install the Package
+Then install:
 ```bash
 npm install @pavliha/aircast-mavlink
 ```
@@ -103,9 +113,9 @@ npx @pavliha/aircast-mavlink list
 - **Registry**: Must be set to GitHub Packages in `publishConfig`
 
 ### Installation Issues
-- **Authentication**: Verify `.npmrc` file and GitHub token
-- **Scope**: Ensure package name includes `@username/` prefix
-- **Registry**: Confirm registry URL in `.npmrc`
+- **Registry**: Ensure you're using the correct registry `https://npm.pkg.github.com`
+- **Scope**: Package name must include the `@pavliha/` prefix
+- **Alternative**: If GitHub Packages fails, try using `--registry` flag directly
 
 ### CI Failures
 - **Node version**: Ensure compatibility with Node.js 16+
