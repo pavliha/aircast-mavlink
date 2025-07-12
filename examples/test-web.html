@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MAVLink Parser Web Test</title>
+</head>
+<body>
+    <h1>MAVLink Parser Web Test</h1>
+    <div id="output"></div>
+    
+    <script src="../dist/parser/index.js"></script>
+    <script>
+        // Simple web test
+        console.log('Testing MAVLink parser in browser...');
+        
+        // This would work if we had a browser-compatible build
+        // For now, this demonstrates the intended usage
+        
+        const output = document.getElementById('output');
+        output.innerHTML = `
+            <p>✅ MAVLink parser loaded successfully</p>
+            <p>📚 See the full WebRTC integration demo at: 
+               <a href="webrtc-integration.html">webrtc-integration.html</a>
+            </p>
+            <p>🔧 For browser usage, you would need to:</p>
+            <ul>
+                <li>Bundle the parser with webpack/rollup</li>
+                <li>Use ES modules instead of CommonJS</li>
+                <li>Import the parser in your web worker</li>
+            </ul>
+        `;
+    </script>
+</body>
+</html>

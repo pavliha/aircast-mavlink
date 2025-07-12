@@ -1,4 +1,4 @@
-import { TypeConverter } from '../src/type-converter';
+import { TypeConverter } from '../src/generator/type-converter';
 import { MAVLinkDialectDefinition } from '../src/types';
 
 describe('TypeConverter', () => {

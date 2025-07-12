@@ -1,4 +1,4 @@
-import { XMLParser } from '../src/xml-parser';
+import { XMLParser } from '../src/generator/xml-parser';
 import { MAVLinkDialectDefinition } from '../src/types';
 
 describe('XMLParser', () => {

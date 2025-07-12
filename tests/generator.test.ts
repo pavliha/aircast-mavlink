@@ -1,4 +1,4 @@
-import { MAVLinkGenerator, generateTypesFromXML } from '../src/generator';
+import { MAVLinkGenerator, generateTypesFromXML } from '../src/generator/generator';
 import { GenerationOptions } from '../src/types';
 import { promises as fs } from 'fs';
 

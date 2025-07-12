@@ -3,9 +3,43 @@
   "version": "1.0.0",
   "description": "TypeScript type generator for MAVLink dialects",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js"
+    },
+    "./types/common": {
+      "types": "./types/common/index.ts",
+      "require": "./types/common/index.js",
+      "import": "./types/common/index.js"
+    },
+    "./types/minimal": {
+      "types": "./types/minimal/index.ts",
+      "require": "./types/minimal/index.js",
+      "import": "./types/minimal/index.js"
+    },
+    "./types/ardupilotmega": {
+      "types": "./types/ardupilotmega/index.ts",
+      "require": "./types/ardupilotmega/index.js",
+      "import": "./types/ardupilotmega/index.js"
+    },
+    "./types/standard": {
+      "types": "./types/standard/index.ts",
+      "require": "./types/standard/index.js",
+      "import": "./types/standard/index.js"
+    }
+  },
   "bin": {
     "aircast-mavlink": "dist/cli.js"
   },
+  "files": [
+    "dist/**/*",
+    "types/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
@@ -32,6 +66,17 @@
   ],
   "author": "Aircast MAVLink",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pavliha/aircast-mavlink.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pavliha/aircast-mavlink/issues"
+  },
+  "homepage": "https://github.com/pavliha/aircast-mavlink#readme",
+  "publishConfig": {
+    "@pavliha:registry": "https://npm.pkg.github.com"
+  },
   "dependencies": {
     "commander": "^11.1.0",
     "handlebars": "^4.7.8",

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { MAVLinkGenerator } from './generator';
-import { BatchProcessor } from './batch-processor';
+import { MAVLinkGenerator } from './generator/generator';
+import { BatchProcessor } from './generator/batch-processor';
 import { GenerationOptions } from './types';
 import { existsSync } from 'fs';
 

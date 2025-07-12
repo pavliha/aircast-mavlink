@@ -1,7 +1,7 @@
 import { parseString } from 'xml2js';
 import fetch from 'node-fetch';
 import { promises as fs } from 'fs';
-import { MAVLinkDialectDefinition, EnumDefinition, MessageDefinition, FieldDefinition, MAVLinkDialect, XMLEnum, XMLMessage } from './types';
+import { MAVLinkDialectDefinition, EnumDefinition, MessageDefinition, FieldDefinition, MAVLinkDialect, XMLEnum, XMLMessage } from '../types';
 
 export class XMLParser {
   private processedUrls = new Set<string>();
@@ -102,14 +102,14 @@ export class XMLParser {
     if (include.startsWith('http')) {
       return include;
     }
-    
+
     // If source is a URL, resolve relative to it
     if (source.startsWith('http')) {
       const url = new URL(source);
       url.pathname = url.pathname.replace(/[^/]*$/, include);
       return url.toString();
     }
-    
+
     // Otherwise, assume it's a file path
     return include;
   }

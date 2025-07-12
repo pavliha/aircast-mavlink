@@ -1,13 +1,13 @@
-import { 
-  MAVLinkDialectDefinition, 
-  EnumDefinition, 
-  MessageDefinition, 
+import {
+  MAVLinkDialectDefinition,
+  EnumDefinition,
+  MessageDefinition,
   FieldDefinition,
   TypeScriptDialect,
   TypeScriptEnum,
   TypeScriptMessage,
   TypeScriptField
-} from './types';
+} from '../types';
 
 export class TypeConverter {
   private static readonly MAVLINK_TO_TS_TYPES: Record<string, string> = {
@@ -137,12 +137,12 @@ export class TypeConverter {
     const arrayMatch = type.match(/^(.+?)\[(\d+)\]$/);
     if (arrayMatch) {
       const elementType = arrayMatch[1];
-      
+
       // Handle string arrays (char arrays)
       if (elementType === 'char') {
         return 'string';
       }
-      
+
       // Handle other arrays
       const tsElementType = this.convertSingleType(elementType, enumName, enums);
       return `${tsElementType}[]`;
@@ -206,7 +206,7 @@ export class TypeConverter {
 
   private parseDescription(description: string): string[] {
     if (!description) return [];
-    
+
     return description
       .split('\n')
       .map(line => line.trim())

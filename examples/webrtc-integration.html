@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAVLink Parser - WebRTC Integration</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #569cd6;
+            border-bottom: 2px solid #569cd6;
+            padding-bottom: 10px;
+        }
+        .section {
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.connected {
+            background: #0f5132;
+            border: 1px solid #198754;
+        }
+        .status.disconnected {
+            background: #58151c;
+            border: 1px solid #dc3545;
+        }
+        .status.connecting {
+            background: #664d03;
+            border: 1px solid #ffc107;
+        }
+        .log {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
+        .message.heartbeat {
+            background: #0d4863;
+            border-left: 3px solid #1f6feb;
+        }
+        .message.gps {
+            background: #0a4b2a;
+            border-left: 3px solid #2ea043;
+        }
+        .message.attitude {
+            background: #5a1e02;
+            border-left: 3px solid #fd7e14;
+        }
+        .message.other {
+            background: #21262d;
+            border-left: 3px solid #6e7681;
+        }
+        .message.error {
+            background: #5a1e1e;
+            border-left: 3px solid #f85149;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #58a6ff;
+        }
+        .stat-label {
+            color: #8b949e;
+            margin-top: 5px;
+        }
+        .demo-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚁 MAVLink Parser - WebRTC Integration Demo</h1>
+        
+        <div class="section">
+            <h3>Connection Status</h3>
+            <div id="status" class="status disconnected">
+                ❌ Not Connected
+            </div>
+            
+            <div class="controls">
+                <button id="connectBtn">Connect to Drone</button>
+                <button id="disconnectBtn" disabled>Disconnect</button>
+                <button id="clearLogBtn">Clear Log</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Demo Controls</h3>
+            <p>Since this is a demo, you can simulate MAVLink messages:</p>
+            <div class="demo-controls">
+                <button id="sendHeartbeat">Send HEARTBEAT</button>
+                <button id="sendGPS">Send GPS_RAW_INT</button>
+                <button id="sendAttitude">Send ATTITUDE</button>
+                <button id="sendMultiple">Send Multiple Messages</button>
+                <button id="sendInvalid">Send Invalid Data</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>MAVLink Messages</h3>
+            <div id="messageLog" class="log">
+                <div class="message other">
+                    📋 Waiting for MAVLink messages...
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Statistics</h3>
+            <div class="stats">
+                <div class="stat-card">
+                    <div id="messageCount" class="stat-value">0</div>
+                    <div class="stat-label">Messages Received</div>
+                </div>
+                <div class="stat-card">
+                    <div id="bytesProcessed" class="stat-value">0</div>
+                    <div class="stat-label">Bytes Processed</div>
+                </div>
+                <div class="stat-card">
+                    <div id="bufferUsage" class="stat-value">0%</div>
+                    <div class="stat-label">Buffer Usage</div>
+                </div>
+                <div class="stat-card">
+                    <div id="parseErrors" class="stat-value">0</div>
+                    <div class="stat-label">Parse Errors</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // MAVLink Parser Integration Demo
+        
+        let parser;
+        let messageCount = 0;
+        let bytesProcessed = 0;
+        let parseErrors = 0;
+        let isConnected = false;
+
+        // Initialize parser (you would import this in a real application)
+        // For demo purposes, we'll simulate the parser functionality
+        class MockMAVLinkParser {
+            constructor(options = {}) {
+                this.options = options;
+                this.bufferUsed = 0;
+                this.bufferSize = options.maxBufferSize || 4096;
+            }
+
+            parseBytes(data) {
+                // Simulate parsing logic for demo
+                const messages = [];
+                
+                // Look for MAVLink magic bytes
+                for (let i = 0; i < data.length - 16; i++) {
+                    if (data[i] === 0xFE || data[i] === 0xFD) {
+                        // Simulate message parsing
+                        const msg = this.simulateMessage(data, i);
+                        if (msg) messages.push(msg);
+                    }
+                }
+                
+                this.bufferUsed = Math.min(this.bufferUsed + data.length, this.bufferSize);
+                return messages;
+            }
+
+            simulateMessage(data, offset) {
+                const msgId = data[offset + 5] || 0;
+                const sysId = data[offset + 3] || 1;
+                const compId = data[offset + 4] || 1;
+                const seq = data[offset + 2] || 0;
+
+                const messageTypes = {
+                    0: 'HEARTBEAT',
+                    24: 'GPS_RAW_INT', 
+                    30: 'ATTITUDE',
+                    33: 'GLOBAL_POSITION_INT'
+                };
+
+                return {
+                    timestamp: Date.now(),
+                    system_id: sysId,
+                    component_id: compId,
+                    message_id: msgId,
+                    message_name: messageTypes[msgId] || `UNKNOWN_${msgId}`,
+                    sequence: seq,
+                    payload: this.simulatePayload(msgId),
+                    protocol_version: data[offset] === 0xFD ? 2 : 1
+                };
+            }
+
+            simulatePayload(msgId) {
+                switch (msgId) {
+                    case 0: // HEARTBEAT
+                        return {
+                            type: 4,
+                            autopilot: 3,
+                            base_mode: 81,
+                            system_status: 4
+                        };
+                    case 24: // GPS_RAW_INT
+                        return {
+                            lat: Math.floor((37.7749 + Math.random() * 0.01) * 1e7),
+                            lon: Math.floor((-122.4194 + Math.random() * 0.01) * 1e7),
+                            alt: Math.floor(100 + Math.random() * 50),
+                            fix_type: 3,
+                            satellites_visible: 8
+                        };
+                    case 30: // ATTITUDE
+                        return {
+                            roll: (Math.random() - 0.5) * 0.2,
+                            pitch: (Math.random() - 0.5) * 0.2,
+                            yaw: Math.random() * Math.PI * 2,
+                            rollspeed: (Math.random() - 0.5) * 0.1,
+                            pitchspeed: (Math.random() - 0.5) * 0.1,
+                            yawspeed: (Math.random() - 0.5) * 0.1
+                        };
+                    default:
+                        return { raw_data: 'simulated_data' };
+                }
+            }
+
+            getStats() {
+                return {
+                    bufferSize: this.bufferSize,
+                    bufferUsed: this.bufferUsed
+                };
+            }
+
+            reset() {
+                this.bufferUsed = 0;
+            }
+        }
+
+        // Initialize parser
+        parser = new MockMAVLinkParser({
+            validateCRC: false,
+            allowProtocolV1: true,
+            allowProtocolV2: true,
+            maxBufferSize: 4096
+        });
+
+        // DOM elements
+        const statusEl = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+        const messageLog = document.getElementById('messageLog');
+
+        // Demo buttons
+        const sendHeartbeatBtn = document.getElementById('sendHeartbeat');
+        const sendGPSBtn = document.getElementById('sendGPS');
+        const sendAttitudeBtn = document.getElementById('sendAttitude');
+        const sendMultipleBtn = document.getElementById('sendMultiple');
+        const sendInvalidBtn = document.getElementById('sendInvalid');
+
+        // Sample MAVLink messages for demo
+        const sampleMessages = {
+            heartbeat: new Uint8Array([0xFE, 0x09, 0x00, 0x01, 0x01, 0x00, 0x04, 0x03, 0x51, 0x04, 0x03, 0x00, 0x00, 0x00, 0x00, 0xB6, 0x3C]),
+            gps: new Uint8Array([0xFE, 0x1E, 0x00, 0x01, 0x01, 0x18, 0x10, 0x27, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE4, 0x0C, 0x02, 0x14, 0x88, 0x13, 0x00, 0x0C, 0x10, 0x27, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 0xD4, 0x9A]),
+            attitude: new Uint8Array([0xFE, 0x1C, 0x00, 0x01, 0x01, 0x1E, 0x10, 0x27, 0x00, 0x00, 0x00, 0x00, 0x20, 0x41, 0x00, 0x00, 0x10, 0x41, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x3F, 0x00, 0x00, 0x80, 0x3F, 0x00, 0x00, 0x00, 0x3F, 0xA2, 0x78])
+        };
+
+        // Event handlers
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        clearLogBtn.addEventListener('click', clearLog);
+
+        sendHeartbeatBtn.addEventListener('click', () => simulateData(sampleMessages.heartbeat));
+        sendGPSBtn.addEventListener('click', () => simulateData(sampleMessages.gps));
+        sendAttitudeBtn.addEventListener('click', () => simulateData(sampleMessages.attitude));
+        sendMultipleBtn.addEventListener('click', () => {
+            simulateData(new Uint8Array([...sampleMessages.heartbeat, ...sampleMessages.gps]));
+        });
+        sendInvalidBtn.addEventListener('click', () => {
+            simulateData(new Uint8Array([0x12, 0x34, 0x56, 0x78, ...sampleMessages.heartbeat]));
+        });
+
+        function connect() {
+            isConnected = true;
+            updateStatus('connecting', '🔄 Connecting...');
+            
+            setTimeout(() => {
+                updateStatus('connected', '✅ Connected to Drone');
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                logMessage('Connection established with drone', 'other');
+            }, 1000);
+        }
+
+        function disconnect() {
+            isConnected = false;
+            updateStatus('disconnected', '❌ Disconnected');
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            parser.reset();
+            logMessage('Disconnected from drone', 'other');
+        }
+
+        function updateStatus(className, text) {
+            statusEl.className = `status ${className}`;
+            statusEl.textContent = text;
+        }
+
+        function simulateData(data) {
+            if (!isConnected) {
+                logMessage('Not connected - please connect first', 'error');
+                return;
+            }
+
+            try {
+                const messages = parser.parseBytes(data);
+                bytesProcessed += data.length;
+                
+                messages.forEach(msg => {
+                    messageCount++;
+                    handleMessage(msg);
+                });
+
+                updateStats();
+            } catch (error) {
+                parseErrors++;
+                logMessage(`Parse error: ${error.message}`, 'error');
+                updateStats();
+            }
+        }
+
+        function handleMessage(msg) {
+            let messageClass = 'other';
+            let content = '';
+
+            switch (msg.message_name) {
+                case 'HEARTBEAT':
+                    messageClass = 'heartbeat';
+                    content = `💓 HEARTBEAT: type=${msg.payload.type}, autopilot=${msg.payload.autopilot}, status=${msg.payload.system_status}`;
+                    break;
+                
+                case 'GPS_RAW_INT':
+                    messageClass = 'gps';
+                    const lat = msg.payload.lat / 1e7;
+                    const lon = msg.payload.lon / 1e7;
+                    content = `🛰️ GPS: ${lat.toFixed(6)}, ${lon.toFixed(6)} (fix: ${msg.payload.fix_type}, sats: ${msg.payload.satellites_visible})`;
+                    break;
+                
+                case 'ATTITUDE':
+                    messageClass = 'attitude';
+                    const roll = (msg.payload.roll * 180 / Math.PI).toFixed(1);
+                    const pitch = (msg.payload.pitch * 180 / Math.PI).toFixed(1);
+                    const yaw = (msg.payload.yaw * 180 / Math.PI).toFixed(1);
+                    content = `✈️ ATTITUDE: roll=${roll}°, pitch=${pitch}°, yaw=${yaw}°`;
+                    break;
+                
+                default:
+                    content = `📦 ${msg.message_name} from system ${msg.system_id}:${msg.component_id}`;
+            }
+
+            logMessage(content, messageClass);
+        }
+
+        function logMessage(text, className = 'other') {
+            const timestamp = new Date().toLocaleTimeString();
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${className}`;
+            messageEl.textContent = `[${timestamp}] ${text}`;
+            
+            messageLog.appendChild(messageEl);
+            messageLog.scrollTop = messageLog.scrollHeight;
+        }
+
+        function clearLog() {
+            messageLog.innerHTML = '<div class="message other">📋 Log cleared</div>';
+        }
+
+        function updateStats() {
+            document.getElementById('messageCount').textContent = messageCount;
+            document.getElementById('bytesProcessed').textContent = bytesProcessed;
+            
+            const stats = parser.getStats();
+            const usage = ((stats.bufferUsed / stats.bufferSize) * 100).toFixed(1);
+            document.getElementById('bufferUsage').textContent = usage + '%';
+            
+            document.getElementById('parseErrors').textContent = parseErrors;
+        }
+
+        // Initialize stats
+        updateStats();
+    </script>
+</body>
+</html>

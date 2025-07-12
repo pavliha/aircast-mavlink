@@ -1,5 +1,5 @@
 import Handlebars from 'handlebars';
-import { TypeScriptDialect } from './types';
+import { TypeScriptDialect } from '../types';
 
 export class TemplateEngine {
   private templates: Map<string, HandlebarsTemplateDelegate> = new Map();

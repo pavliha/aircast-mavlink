@@ -1,4 +1,4 @@
-import { TemplateEngine } from '../src/template-engine';
+import { TemplateEngine } from '../src/generator/template-engine';
 import { TypeScriptDialect } from '../src/types';
 
 describe('TemplateEngine', () => {

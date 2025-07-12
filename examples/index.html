@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAVLink Parser Examples</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .example-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .example-card h3 {
+            margin-top: 0;
+            color: #2c5aa0;
+        }
+        .code-snippet {
+            background: #f4f4f4;
+            border-left: 4px solid #2c5aa0;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        .button {
+            display: inline-block;
+            background: #2c5aa0;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #1e3f73;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .feature {
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚁 MAVLink Parser Examples</h1>
+    
+    <p>Welcome to the Aircast MAVLink parser examples! This collection demonstrates how to use the MAVLink parser in various scenarios, from simple Node.js applications to complex web-based ground control stations.</p>
+
+    <div class="features">
+        <div class="feature">
+            <h4>🔧 Protocol Support</h4>
+            <p>Supports both MAVLink v1 and v2 protocols with automatic detection</p>
+        </div>
+        <div class="feature">
+            <h4>🌊 Streaming</h4>
+            <p>Handles incomplete data and streaming scenarios gracefully</p>
+        </div>
+        <div class="feature">
+            <h4>🌐 Web Ready</h4>
+            <p>Works in browsers with web workers for non-blocking parsing</p>
+        </div>
+        <div class="feature">
+            <h4>⚡ High Performance</h4>
+            <p>Efficient buffer management and minimal memory usage</p>
+        </div>
+    </div>
+
+    <div class="example-card">
+        <h3>1. Basic Parser Usage</h3>
+        <p>Learn the fundamentals of parsing MAVLink messages with a simple Node.js example.</p>
+        <p><strong>Features:</strong> Single message parsing, streaming data, multiple messages, error handling</p>
+        <div class="code-snippet">npm run build && node examples/basic-parser.js</div>
+        <a href="basic-parser.js" class="button">View Code</a>
+    </div>
+
+    <div class="example-card">
+        <h3>2. WebRTC Integration Demo</h3>
+        <p>Interactive web demo showing real-time MAVLink parsing with a drone connection simulator.</p>
+        <p><strong>Features:</strong> Live message display, statistics dashboard, protocol visualization</p>
+        <a href="webrtc-integration.html" class="button">Launch Demo</a>
+        <a href="webrtc-integration.html" class="button">View Code</a>
+    </div>
+
+    <div class="example-card">
+        <h3>3. Node.js Streaming</h3>
+        <p>Production-ready Node.js implementation for TCP/UDP connections and file replay.</p>
+        <p><strong>Features:</strong> TCP client, UDP server, file replay, statistics, event-driven architecture</p>
+        <div class="code-snippet">
+# Run tests<br>
+node examples/nodejs-stream.js test<br><br>
+# Connect to MAVLink TCP source<br>
+node examples/nodejs-stream.js tcp localhost 5760<br><br>
+# Start UDP server<br>
+node examples/nodejs-stream.js udp 14550
+        </div>
+        <a href="nodejs-stream.js" class="button">View Code</a>
+    </div>
+
+    <div class="example-card">
+        <h3>4. Web Worker Integration</h3>
+        <p>Example showing how to use the parser in web workers for non-blocking message processing.</p>
+        <p><strong>Features:</strong> Web worker setup, message passing, WebRTC/WebSocket integration patterns</p>
+        <a href="web-worker-example.js" class="button">View Code</a>
+    </div>
+
+    <h2>Quick Start</h2>
+    
+    <div class="code-snippet">
+# Install dependencies<br>
+npm install<br><br>
+# Build the parser<br>
+npm run build<br><br>
+# Run basic example<br>
+node examples/basic-parser.js<br><br>
+# Start web server for browser examples<br>
+cd examples && python3 -m http.server 8000<br>
+# Then visit http://localhost:8000
+    </div>
+
+    <h2>Common Use Cases</h2>
+
+    <div class="features">
+        <div class="feature">
+            <h4>🎮 Ground Control Station</h4>
+            <p>Parse telemetry data from drones and display real-time information in web applications.</p>
+        </div>
+        <div class="feature">
+            <h4>📊 Data Analysis</h4>
+            <p>Process recorded flight logs to analyze performance, extract GPS tracks, and generate reports.</p>
+        </div>
+        <div class="feature">
+            <h4>🔗 Protocol Bridge</h4>
+            <p>Convert between different MAVLink transports (TCP, UDP, WebRTC, WebSocket).</p>
+        </div>
+        <div class="feature">
+            <h4>🧪 Testing & Simulation</h4>
+            <p>Parse simulated MAVLink data for testing autopilot software and ground station applications.</p>
+        </div>
+    </div>
+
+    <h2>Supported Messages</h2>
+    <p>The parser handles all standard MAVLink messages including:</p>
+    <ul>
+        <li><strong>HEARTBEAT</strong> - System status and keep-alive</li>
+        <li><strong>GPS_RAW_INT</strong> - Raw GPS position data</li>
+        <li><strong>ATTITUDE</strong> - Vehicle orientation (roll, pitch, yaw)</li>
+        <li><strong>GLOBAL_POSITION_INT</strong> - Global position with altitude</li>
+        <li><strong>VFR_HUD</strong> - HUD display data</li>
+        <li><strong>MISSION_ITEM</strong> - Waypoint data</li>
+        <li><strong>PARAM_VALUE</strong> - Parameter values</li>
+        <li>And many more...</li>
+    </ul>
+
+    <h2>Documentation</h2>
+    <p>For more information:</p>
+    <ul>
+        <li><a href="README.md">Examples README</a> - Detailed usage instructions</li>
+        <li><a href="../README.md">Main README</a> - Project overview and API reference</li>
+        <li><a href="../tests/">Tests</a> - Test suite with examples</li>
+    </ul>
+
+    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666;">
+        <p>Aircast MAVLink Parser - Examples and Documentation</p>
+    </footer>
+</body>
+</html>

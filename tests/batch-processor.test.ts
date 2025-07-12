@@ -1,4 +1,4 @@
-import { BatchProcessor } from '../src/batch-processor';
+import { BatchProcessor } from '../src/generator/batch-processor';
 
 // Mock node-fetch
 jest.mock('node-fetch', () => ({

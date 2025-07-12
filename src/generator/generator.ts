@@ -4,7 +4,7 @@ import { parseString } from 'xml2js';
 import { XMLParser } from './xml-parser';
 import { TypeConverter } from './type-converter';
 import { TemplateEngine } from './template-engine';
-import { GenerationOptions, MAVLinkDialect, MAVLinkDialectDefinition } from './types';
+import { GenerationOptions, MAVLinkDialect, MAVLinkDialectDefinition } from '../types';
 
 export class MAVLinkGenerator {
   private xmlParser: XMLParser;

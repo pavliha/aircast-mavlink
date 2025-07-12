@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import fetch from 'node-fetch';
 import { MAVLinkGenerator } from './generator';
-import { GenerationOptions } from './types';
+import { GenerationOptions } from '../types';
 
 export interface BatchProcessorOptions {
   outputDir: string;
@@ -22,7 +22,7 @@ export class BatchProcessor {
 
   async processAllDialects(options: BatchProcessorOptions): Promise<void> {
     console.log('Fetching list of available dialects...');
-    
+
     // Get list of XML files from GitHub API
     const response = await fetch(BatchProcessor.MAVLINK_DIALECTS_URL);
     if (!response.ok) {
@@ -42,9 +42,9 @@ export class BatchProcessor {
     for (const file of xmlFiles) {
       const dialectName = file.name.replace('.xml', '').toLowerCase().replace('_', '');
       const dialectOutputDir = join(options.outputDir, dialectName);
-      
+
       console.log(`Processing ${file.name}...`);
-      
+
       try {
         const generationOptions: GenerationOptions = {
           dialectName,
@@ -55,7 +55,7 @@ export class BatchProcessor {
 
         await this.generator.generateFromURL(file.download_url, dialectOutputDir, generationOptions);
         processedDialects.push(dialectName);
-        
+
         // Reset parser state for next dialect
         this.generator.reset();
       } catch (error) {
@@ -80,9 +80,9 @@ export class BatchProcessor {
       const xmlFileName = `${dialectName}.xml`;
       const dialectUrl = `${BatchProcessor.MAVLINK_RAW_BASE_URL}/${xmlFileName}`;
       const dialectOutputDir = join(options.outputDir, dialectName.toLowerCase());
-      
+
       console.log(`Processing ${dialectName}...`);
-      
+
       try {
         const generationOptions: GenerationOptions = {
           dialectName: dialectName.toLowerCase(),
@@ -93,7 +93,7 @@ export class BatchProcessor {
 
         await this.generator.generateFromURL(dialectUrl, dialectOutputDir, generationOptions);
         processedDialects.push(dialectName.toLowerCase());
-        
+
         // Reset parser state for next dialect
         this.generator.reset();
       } catch (error) {

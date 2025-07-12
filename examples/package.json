@@ -1,0 +1,27 @@
+{
+  "name": "aircast-mavlink-examples",
+  "version": "1.0.0",
+  "description": "Examples for the Aircast MAVLink parser",
+  "main": "basic-parser.js",
+  "scripts": {
+    "demo:basic": "node basic-parser.js",
+    "demo:tcp": "node nodejs-stream.js tcp",
+    "demo:udp": "node nodejs-stream.js udp",
+    "demo:test": "node nodejs-stream.js test",
+    "serve": "python3 -m http.server 8000"
+  },
+  "keywords": [
+    "mavlink",
+    "parser",
+    "examples",
+    "drone",
+    "telemetry",
+    "webrtc",
+    "websocket"
+  ],
+  "author": "Aircast MAVLink",
+  "license": "MIT",
+  "dependencies": {
+    "aircast-mavlink": "file:.."
+  }
+}
