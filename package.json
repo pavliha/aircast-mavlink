@@ -1,10 +1,10 @@
 {
-  "name": "mavlink-ts-generator",
+  "name": "aircast-mavlink",
   "version": "1.0.0",
   "description": "TypeScript type generator for MAVLink dialects",
   "main": "dist/index.js",
   "bin": {
-    "mavlink-ts-gen": "dist/cli.js"
+    "aircast-mavlink": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -12,16 +12,25 @@
     "dev": "tsx src/cli.ts",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "gen:common": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/common.xml -o ./types/common",
+    "gen:ardupilotmega": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/ardupilotmega.xml -o ./types/ardupilotmega",
+    "gen:minimal": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/minimal.xml -o ./types/minimal",
+    "gen:test": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/test.xml -o ./types/test",
+    "gen:paparazzi": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/paparazzi.xml -o ./types/paparazzi",
+    "gen:python_array_test": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/python_array_test.xml -o ./types/python_array_test",
+    "gen:standard": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/standard.xml -o ./types/standard",
+    "gen:all": "npm run gen:common && npm run gen:ardupilotmega && npm run gen:minimal && npm run gen:test && npm run gen:paparazzi && npm run gen:python_array_test && npm run gen:standard"
   },
   "keywords": [
+    "aircast",
     "mavlink",
     "typescript",
     "code-generation",
     "drone",
     "autopilot"
   ],
-  "author": "MAVLink TypeScript Generator",
+  "author": "Aircast MAVLink",
   "license": "MIT",
   "dependencies": {
     "commander": "^11.1.0",

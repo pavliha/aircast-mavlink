@@ -51,7 +51,7 @@ export class MAVLinkGenerator {
       const messagesContent = this.templateEngine.generateMessages(tsDialect);
       await fs.writeFile(join(outputPath, 'messages.ts'), messagesContent);
 
-      const indexContent = this.templateEngine.generateIndex(tsDialect);
+      const indexContent = this.templateEngine.generateIndex(tsDialect, options.includeEnums);
       await fs.writeFile(join(outputPath, 'index.ts'), indexContent);
     }
 
@@ -101,7 +101,7 @@ export async function generateTypesFromXML(
       files['enums.ts'] = templateEngine.generateEnums(tsDialect);
     }
     files['messages.ts'] = templateEngine.generateMessages(tsDialect);
-    files['index.ts'] = templateEngine.generateIndex(tsDialect);
+    files['index.ts'] = templateEngine.generateIndex(tsDialect, options.includeEnums);
   }
 
   return files;

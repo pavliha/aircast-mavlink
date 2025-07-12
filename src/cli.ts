@@ -9,8 +9,8 @@ import { existsSync } from 'fs';
 const program = new Command();
 
 program
-  .name('mavlink-ts-gen')
-  .description('TypeScript type generator for MAVLink dialects')
+  .name('aircast-mavlink')
+  .description('Aircast MAVLink TypeScript type generator')
   .version('1.0.0');
 
 program

@@ -28,11 +28,41 @@ export interface MAVLinkMessage<Content = unknown> {
 {{/each}}
 export type {{ name }} =
 {{#each values}}
-  | '{{ name }}'{{#if description}} // {{ join description " " }}{{/if}}
+  | {{ value }}{{#if description}} // {{ name }} - {{ join description " " }}{{/if}}
 {{/each}}
-  | string;
+  | number;
 
 {{/each}}
+`));
+
+    // Enums template
+    this.templates.set('enums', Handlebars.compile(`// Auto-generated TypeScript enums for {{ dialectName }} dialect
+
+{{#each enums}}
+{{#each description}}
+// {{ this }}
+{{/each}}
+export enum {{ name }}Enum {
+{{#each values}}
+{{#each description}}
+  // {{ this }}
+{{/each}}
+  {{ name }} = {{ value }},
+{{/each}}
+}
+
+{{/each}}
+`));
+
+    // Messages template
+    this.templates.set('messages', Handlebars.compile(`// Auto-generated TypeScript message interfaces for {{ dialectName }} dialect
+
+import { MAVLinkMessage } from './types';
+import type {
+{{#each enums}}
+  {{ name }},
+{{/each}}
+} from './types';
 
 {{#each messages}}
 {{#each description}}
@@ -70,50 +100,6 @@ export function is{{ name }}(msg: MAVLinkMessage): msg is MAVLinkMessage<Message
 {{/each}}
 `));
 
-    // Enums template
-    this.templates.set('enums', Handlebars.compile(`// Auto-generated TypeScript enums for {{ dialectName }} dialect
-
-{{#each enums}}
-{{#each description}}
-// {{ this }}
-{{/each}}
-export enum {{ name }}Enum {
-{{#each values}}
-{{#each description}}
-  // {{ this }}
-{{/each}}
-  {{ name }} = '{{ name }}',
-{{/each}}
-}
-
-export type {{ name }} =
-{{#each values}}
-  | '{{ name }}'{{#if description}} // {{ join description " " }}{{/if}}
-{{/each}}
-  | string;
-
-{{/each}}
-`));
-
-    // Messages template
-    this.templates.set('messages', Handlebars.compile(`// Auto-generated TypeScript message interfaces for {{ dialectName }} dialect
-
-{{#each messages}}
-{{#each description}}
-// {{ this }}
-{{/each}}
-export interface Message{{ name }} {
-{{#each fields}}
-{{#each description}}
-  // {{ this }}
-{{/each}}
-  {{ name }}{{#if optional}}?{{/if}}: {{ type }};
-{{/each}}
-}
-
-{{/each}}
-`));
-
     // Index template
     this.templates.set('index', Handlebars.compile(`// Auto-generated TypeScript index file
 // Exports all dialect types
@@ -142,9 +128,9 @@ export interface MAVLinkMessage<Content = unknown> {
 {{/each}}
 export type {{ name }} =
 {{#each values}}
-  | '{{ name }}'{{#if description}} // {{ join description " " }}{{/if}}
+  | {{ value }}{{#if description}} // {{ name }} - {{ join description " " }}{{/if}}
 {{/each}}
-  | string;
+  | number;
 
 {{/each}}
 
@@ -224,12 +210,12 @@ export function is{{ name }}(msg: MAVLinkMessage): msg is MAVLinkMessage<Message
     return template(dialect);
   }
 
-  generateIndex(dialect: TypeScriptDialect): string {
+  generateIndex(dialect: TypeScriptDialect, includeEnums: boolean = false): string {
     const template = this.templates.get('index');
     if (!template) {
       throw new Error('Index template not found');
     }
-    return template(dialect);
+    return template({ ...dialect, includeEnums });
   }
 
   generateSingle(dialect: TypeScriptDialect): string {
