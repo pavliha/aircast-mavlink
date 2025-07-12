@@ -54,9 +54,9 @@
     "gen:python_array_test": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/python_array_test.xml -o ./dist/types/python_array_test",
     "gen:standard": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/standard.xml -o ./dist/types/standard",
     "gen:all": "npm run gen:common && npm run gen:ardupilotmega && npm run gen:minimal && npm run gen:test && npm run gen:paparazzi && npm run gen:python_array_test && npm run gen:standard",
-    "release:patch": "npm version patch && git push origin master --tags && gh release create v$(node -p \"require('./package.json').version\") --title \"v$(node -p \"require('./package.json').version\")\" --generate-notes",
-    "release:minor": "npm version minor && git push origin master --tags && gh release create v$(node -p \"require('./package.json').version\") --title \"v$(node -p \"require('./package.json').version\")\" --generate-notes",
-    "release:major": "npm version major && git push origin master --tags && gh release create v$(node -p \"require('./package.json').version\") --title \"v$(node -p \"require('./package.json').version\")\" --generate-notes"
+    "release:patch": "npm version patch && git push origin master --tags && npm publish && gh release create v$(node -p \"require('./package.json').version\") --title \"v$(node -p \"require('./package.json').version\")\" --generate-notes",
+    "release:minor": "npm version minor && git push origin master --tags && npm publish && gh release create v$(node -p \"require('./package.json').version\") --title \"v$(node -p \"require('./package.json').version\")\" --generate-notes",
+    "release:major": "npm version major && git push origin master --tags && npm publish && gh release create v$(node -p \"require('./package.json').version\") --title \"v$(node -p \"require('./package.json').version\")\" --generate-notes"
   },
   "keywords": [
     "aircast",

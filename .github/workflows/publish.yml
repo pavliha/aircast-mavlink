@@ -1,4 +1,4 @@
-name: Publish to GitHub Packages
+name: Publish to npm
 
 on:
   release:
@@ -34,7 +34,7 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20.x'
-        registry-url: 'https://npm.pkg.github.com'
+        registry-url: 'https://registry.npmjs.org'
         cache: 'npm'
         
     - name: Install dependencies
@@ -50,30 +50,13 @@ jobs:
       if: github.event.inputs.version != ''
       run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
       
-    - name: Configure package for GitHub Packages
-      run: |
-        # Get the repository owner and name
-        REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
-        REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-        
-        # Update package name to include scope
-        npm pkg set name="@${REPO_OWNER}/${REPO_NAME}"
-        
-        # Add GitHub Packages registry
-        npm pkg set publishConfig.registry="https://npm.pkg.github.com"
-        npm pkg set repository.type="git"
-        npm pkg set repository.url="git+https://github.com/${{ github.repository }}.git"
-        
-        echo "Updated package.json for GitHub Packages:"
-        cat package.json | jq '.name, .publishConfig, .repository'
-        
-    - name: Publish to GitHub Packages
+    - name: Publish to npm
       run: |
         TAG="${{ github.event.inputs.tag || 'latest' }}"
-        echo "Publishing with tag: $TAG"
+        echo "Publishing to npm with tag: $TAG"
         npm publish --tag $TAG
       env:
-        NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         
     - name: Create release summary
       run: |
@@ -84,7 +67,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Package:** \`$PACKAGE_NAME\`" >> $GITHUB_STEP_SUMMARY
         echo "**Version:** \`$PACKAGE_VERSION\`" >> $GITHUB_STEP_SUMMARY
-        echo "**Registry:** GitHub Packages" >> $GITHUB_STEP_SUMMARY
+        echo "**Registry:** npm" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Installation" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
@@ -107,13 +90,11 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20.x'
-        registry-url: 'https://npm.pkg.github.com'
+        registry-url: 'https://registry.npmjs.org'
         
     - name: Verify package installation
       run: |
-        REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
-        REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-        PACKAGE_NAME="@${REPO_OWNER}/${REPO_NAME}"
+        PACKAGE_NAME="@aircast-4g/mavlink"
         
         echo "Attempting to install $PACKAGE_NAME..."
         
@@ -133,5 +114,3 @@ jobs:
         "
         
         echo "✅ Package verification successful"
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
