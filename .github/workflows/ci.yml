@@ -36,6 +36,13 @@ jobs:
     - name: Build project
       run: npm run build
       
+    - name: Generate and compile types
+      run: |
+        npm run gen:common
+        npm run gen:minimal
+        npx tsc types/common/*.ts --outDir types/common --target ES2020 --module commonjs --skipLibCheck
+        npx tsc types/minimal/*.ts --outDir types/minimal --target ES2020 --module commonjs --skipLibCheck
+      
     - name: Test CLI functionality
       run: |
         node dist/cli.js --help
