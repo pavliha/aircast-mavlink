@@ -1,5 +1,5 @@
 {
-  "name": "aircast-mavlink",
+  "name": "@aircast-4g/mavlink",
   "version": "1.0.1",
   "description": "TypeScript type generator for MAVLink dialects",
   "main": "dist/index.js",
@@ -11,24 +11,24 @@
       "import": "./dist/index.js"
     },
     "./types/common": {
-      "types": "./types/common/index.ts",
-      "require": "./types/common/index.js",
-      "import": "./types/common/index.js"
+      "types": "./dist/types/common/index.d.ts",
+      "require": "./dist/types/common/index.js",
+      "import": "./dist/types/common/index.js"
     },
     "./types/minimal": {
-      "types": "./types/minimal/index.ts",
-      "require": "./types/minimal/index.js",
-      "import": "./types/minimal/index.js"
+      "types": "./dist/types/minimal/index.d.ts",
+      "require": "./dist/types/minimal/index.js",
+      "import": "./dist/types/minimal/index.js"
     },
     "./types/ardupilotmega": {
-      "types": "./types/ardupilotmega/index.ts",
-      "require": "./types/ardupilotmega/index.js",
-      "import": "./types/ardupilotmega/index.js"
+      "types": "./dist/types/ardupilotmega/index.d.ts",
+      "require": "./dist/types/ardupilotmega/index.js",
+      "import": "./dist/types/ardupilotmega/index.js"
     },
     "./types/standard": {
-      "types": "./types/standard/index.ts",
-      "require": "./types/standard/index.js",
-      "import": "./types/standard/index.js"
+      "types": "./dist/types/standard/index.d.ts",
+      "require": "./dist/types/standard/index.js",
+      "import": "./dist/types/standard/index.js"
     }
   },
   "bin": {
@@ -36,25 +36,27 @@
   },
   "files": [
     "dist/**/*",
-    "types/**/*",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run gen:common && npm run gen:ardupilotmega && npm run gen:minimal",
     "start": "node dist/cli.js",
     "dev": "tsx src/cli.ts",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist",
-    "gen:common": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/common.xml -o ./types/common",
-    "gen:ardupilotmega": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/ardupilotmega.xml -o ./types/ardupilotmega",
-    "gen:minimal": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/minimal.xml -o ./types/minimal",
-    "gen:test": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/test.xml -o ./types/test",
-    "gen:paparazzi": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/paparazzi.xml -o ./types/paparazzi",
-    "gen:python_array_test": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/python_array_test.xml -o ./types/python_array_test",
-    "gen:standard": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/standard.xml -o ./types/standard",
-    "gen:all": "npm run gen:common && npm run gen:ardupilotmega && npm run gen:minimal && npm run gen:test && npm run gen:paparazzi && npm run gen:python_array_test && npm run gen:standard"
+    "gen:common": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/common.xml -o ./dist/types/common",
+    "gen:ardupilotmega": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/ardupilotmega.xml -o ./dist/types/ardupilotmega",
+    "gen:minimal": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/minimal.xml -o ./dist/types/minimal",
+    "gen:test": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/test.xml -o ./dist/types/test",
+    "gen:paparazzi": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/paparazzi.xml -o ./dist/types/paparazzi",
+    "gen:python_array_test": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/python_array_test.xml -o ./dist/types/python_array_test",
+    "gen:standard": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/standard.xml -o ./dist/types/standard",
+    "gen:all": "npm run gen:common && npm run gen:ardupilotmega && npm run gen:minimal && npm run gen:test && npm run gen:paparazzi && npm run gen:python_array_test && npm run gen:standard",
+    "release:patch": "npm version patch && git push origin master --tags && gh release create v$(node -p \"require('./package.json').version\") --title \"v$(node -p \"require('./package.json').version\")\" --generate-notes",
+    "release:minor": "npm version minor && git push origin master --tags && gh release create v$(node -p \"require('./package.json').version\") --title \"v$(node -p \"require('./package.json').version\")\" --generate-notes",
+    "release:major": "npm version major && git push origin master --tags && gh release create v$(node -p \"require('./package.json').version\") --title \"v$(node -p \"require('./package.json').version\")\" --generate-notes"
   },
   "keywords": [
     "aircast",
@@ -75,7 +77,7 @@
   },
   "homepage": "https://github.com/pavliha/aircast-mavlink#readme",
   "publishConfig": {
-    "@pavliha:registry": "https://npm.pkg.github.com"
+    "access": "public"
   },
   "dependencies": {
     "commander": "^11.1.0",

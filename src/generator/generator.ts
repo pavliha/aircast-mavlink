@@ -55,7 +55,70 @@ export class MAVLinkGenerator {
       await fs.writeFile(join(outputPath, 'index.ts'), indexContent);
     }
 
+    // Always generate decoder definitions in dist folder (for both single and separate modes)
+    const decoderContent = this.generateDecoderDefinitions(definition, options.dialectName);
+    const distDecoderPath = join(process.cwd(), 'dist', 'decoders', `${options.dialectName}.ts`);
+    await fs.mkdir(join(process.cwd(), 'dist', 'decoders'), { recursive: true });
+    await fs.writeFile(distDecoderPath, decoderContent);
+
     console.log(`Generated TypeScript types for ${options.dialectName} in ${outputPath}`);
+  }
+
+  private generateDecoderDefinitions(definition: MAVLinkDialectDefinition, dialectName: string): string {
+    let code = `// Auto-generated decoder definitions for ${dialectName} dialect\n`;
+    code += `// Generated from MAVLink XML definitions\n\n`;
+    
+    code += `export interface MessageDefinition {\n`;
+    code += `  id: number;\n`;
+    code += `  name: string;\n`;
+    code += `  fields: FieldDefinition[];\n`;
+    code += `}\n\n`;
+    
+    code += `export interface FieldDefinition {\n`;
+    code += `  name: string;\n`;
+    code += `  type: string;\n`;
+    code += `  arrayLength?: number;\n`;
+    code += `  extension?: boolean;\n`;
+    code += `}\n\n`;
+    
+    code += `export const MESSAGE_DEFINITIONS: MessageDefinition[] = [\n`;
+    
+    for (const message of definition.messages || []) {
+      code += `  {\n`;
+      code += `    id: ${message.id},\n`;
+      code += `    name: '${message.name}',\n`;
+      code += `    fields: [\n`;
+      
+      for (const field of message.fields || []) {
+        let fieldType = field.type;
+        let arrayLength: number | undefined;
+        
+        // Handle array types like uint8_t[4]
+        const arrayMatch = fieldType.match(/^([^[]+)\[(\d+)\]$/);
+        if (arrayMatch) {
+          fieldType = arrayMatch[1];
+          arrayLength = parseInt(arrayMatch[2]);
+        }
+        
+        code += `      {\n`;
+        code += `        name: '${field.name}',\n`;
+        code += `        type: '${fieldType}',\n`;
+        if (arrayLength) {
+          code += `        arrayLength: ${arrayLength},\n`;
+        }
+        if (field.extension) {
+          code += `        extension: ${field.extension},\n`;
+        }
+        code += `      },\n`;
+      }
+      
+      code += `    ]\n`;
+      code += `  },\n`;
+    }
+    
+    code += `];\n`;
+    
+    return code;
   }
 
   reset(): void {

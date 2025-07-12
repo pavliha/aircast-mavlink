@@ -1,256 +1,281 @@
-// Message decoder for MAVLink messages
-import { MAVLinkFrame, ParsedMAVLinkMessage, ParserError } from './types';
+import { ParsedMAVLinkMessage, MAVLinkFrame } from './types';
+
+interface MessageDefinition {
+  id: number;
+  name: string;
+  fields: FieldDefinition[];
+}
+
+interface FieldDefinition {
+  name: string;
+  type: string;
+  arrayLength?: number;
+  extension?: boolean;
+}
 
 export class MAVLinkMessageDecoder {
-  private messageMap: Map<number, any> = new Map();
-  
+  private messageDefinitions: Map<number, MessageDefinition> = new Map();
+  private definitionsLoaded: boolean = false;
+
   constructor() {
-    // Message map initialization - would be enhanced with actual message definitions
+    // Start loading generated definitions immediately
+    this.loadGeneratedDefinitions().catch(error => {
+      console.warn('Failed to load generated message definitions:', error);
+      console.warn('Messages will show as UNKNOWN until definitions are loaded');
+    });
   }
 
-  public decode(frame: MAVLinkFrame & { protocol_version: 1 | 2 }): ParsedMAVLinkMessage {
-    const timestamp = Date.now();
+  decode(frame: MAVLinkFrame & { crc_ok?: boolean; protocol_version?: 1 | 2 }): ParsedMAVLinkMessage {
+    const messageDef = this.messageDefinitions.get(frame.message_id);
     
-    try {
-      // Decode payload based on message ID
-      const payload = this.decodePayload(frame.message_id, frame.payload);
-      const messageName = this.getMessageName(frame.message_id);
-
+    // Determine protocol version from magic byte if not provided
+    const protocolVersion = frame.protocol_version || (frame.magic === 0xFD ? 2 : 1);
+    
+    if (!messageDef) {
       return {
-        timestamp,
+        timestamp: Date.now(),
         system_id: frame.system_id,
         component_id: frame.component_id,
         message_id: frame.message_id,
-        message_name: messageName,
+        message_name: `UNKNOWN_${frame.message_id}`,
         sequence: frame.sequence,
-        payload,
-        protocol_version: frame.protocol_version,
+        payload: {
+          raw_payload: Array.from(frame.payload)
+        },
+        protocol_version: protocolVersion,
         checksum: frame.checksum,
+        crc_ok: frame.crc_ok !== false,
         signature: frame.signature
       };
-    } catch (error) {
-      throw new ParserError(`Failed to decode message: ${error instanceof Error ? error.message : 'Unknown error'}`, frame);
     }
-  }
 
-  private decodePayload(messageId: number, payload: Uint8Array): Record<string, any> {
-    // Basic payload decoder - this would be enhanced with proper type definitions
-    const decoded: Record<string, any> = {};
+    const payload = this.decodePayload(frame.payload, messageDef.fields);
     
-    switch (messageId) {
-      case 0: // HEARTBEAT
-        decoded.type = payload[0];
-        decoded.autopilot = payload[1];
-        decoded.base_mode = payload[2];
-        decoded.custom_mode = new DataView(payload.buffer, payload.byteOffset).getUint32(3, true);
-        decoded.system_status = payload[7];
-        decoded.mavlink_version = payload[8];
-        break;
-        
-      case 1: // SYS_STATUS
-        decoded.onboard_control_sensors_present = new DataView(payload.buffer, payload.byteOffset).getUint32(0, true);
-        decoded.onboard_control_sensors_enabled = new DataView(payload.buffer, payload.byteOffset).getUint32(4, true);
-        decoded.onboard_control_sensors_health = new DataView(payload.buffer, payload.byteOffset).getUint32(8, true);
-        decoded.load = new DataView(payload.buffer, payload.byteOffset).getUint16(12, true);
-        decoded.voltage_battery = new DataView(payload.buffer, payload.byteOffset).getUint16(14, true);
-        decoded.current_battery = new DataView(payload.buffer, payload.byteOffset).getInt16(16, true);
-        decoded.battery_remaining = payload[18];
-        break;
-        
-      case 4: // PING
-        decoded.time_usec = new DataView(payload.buffer, payload.byteOffset).getBigUint64(0, true);
-        decoded.seq = new DataView(payload.buffer, payload.byteOffset).getUint32(8, true);
-        decoded.target_system = payload[12];
-        decoded.target_component = payload[13];
-        break;
-        
-      case 30: // ATTITUDE
-        decoded.time_boot_ms = new DataView(payload.buffer, payload.byteOffset).getUint32(0, true);
-        decoded.roll = new DataView(payload.buffer, payload.byteOffset).getFloat32(4, true);
-        decoded.pitch = new DataView(payload.buffer, payload.byteOffset).getFloat32(8, true);
-        decoded.yaw = new DataView(payload.buffer, payload.byteOffset).getFloat32(12, true);
-        decoded.rollspeed = new DataView(payload.buffer, payload.byteOffset).getFloat32(16, true);
-        decoded.pitchspeed = new DataView(payload.buffer, payload.byteOffset).getFloat32(20, true);
-        decoded.yawspeed = new DataView(payload.buffer, payload.byteOffset).getFloat32(24, true);
-        break;
-        
-      case 33: // GLOBAL_POSITION_INT
-        decoded.time_boot_ms = new DataView(payload.buffer, payload.byteOffset).getUint32(0, true);
-        decoded.lat = new DataView(payload.buffer, payload.byteOffset).getInt32(4, true);
-        decoded.lon = new DataView(payload.buffer, payload.byteOffset).getInt32(8, true);
-        decoded.alt = new DataView(payload.buffer, payload.byteOffset).getInt32(12, true);
-        decoded.relative_alt = new DataView(payload.buffer, payload.byteOffset).getInt32(16, true);
-        decoded.vx = new DataView(payload.buffer, payload.byteOffset).getInt16(20, true);
-        decoded.vy = new DataView(payload.buffer, payload.byteOffset).getInt16(22, true);
-        decoded.vz = new DataView(payload.buffer, payload.byteOffset).getInt16(24, true);
-        decoded.hdg = new DataView(payload.buffer, payload.byteOffset).getUint16(26, true);
-        break;
-        
-      default:
-        // For unknown messages, return raw bytes as hex
-        decoded.raw_data = Array.from(payload).map(b => b.toString(16).padStart(2, '0')).join('');
-        break;
-    }
-    
-    return decoded;
-  }
-
-  private getMessageName(messageId: number): string {
-    const messageNames: Record<number, string> = {
-      0: 'HEARTBEAT',
-      1: 'SYS_STATUS',
-      2: 'SYSTEM_TIME',
-      4: 'PING',
-      5: 'CHANGE_OPERATOR_CONTROL',
-      6: 'CHANGE_OPERATOR_CONTROL_ACK',
-      7: 'AUTH_KEY',
-      11: 'SET_MODE',
-      20: 'PARAM_REQUEST_READ',
-      21: 'PARAM_REQUEST_LIST',
-      22: 'PARAM_VALUE',
-      23: 'PARAM_SET',
-      24: 'GPS_RAW_INT',
-      25: 'GPS_STATUS',
-      26: 'SCALED_IMU',
-      27: 'RAW_IMU',
-      28: 'RAW_PRESSURE',
-      29: 'SCALED_PRESSURE',
-      30: 'ATTITUDE',
-      31: 'ATTITUDE_QUATERNION',
-      32: 'LOCAL_POSITION_NED',
-      33: 'GLOBAL_POSITION_INT',
-      34: 'RC_CHANNELS_SCALED',
-      35: 'RC_CHANNELS_RAW',
-      36: 'SERVO_OUTPUT_RAW',
-      37: 'MISSION_REQUEST_PARTIAL_LIST',
-      38: 'MISSION_WRITE_PARTIAL_LIST',
-      39: 'MISSION_ITEM',
-      40: 'MISSION_REQUEST',
-      41: 'MISSION_SET_CURRENT',
-      42: 'MISSION_CURRENT',
-      43: 'MISSION_REQUEST_LIST',
-      44: 'MISSION_COUNT',
-      45: 'MISSION_CLEAR_ALL',
-      46: 'MISSION_ITEM_REACHED',
-      47: 'MISSION_ACK',
-      48: 'SET_GPS_GLOBAL_ORIGIN',
-      49: 'GPS_GLOBAL_ORIGIN',
-      50: 'PARAM_MAP_RC',
-      51: 'MISSION_REQUEST_INT',
-      54: 'SAFETY_SET_ALLOWED_AREA',
-      55: 'SAFETY_ALLOWED_AREA',
-      61: 'ATTITUDE_QUATERNION_COV',
-      62: 'NAV_CONTROLLER_OUTPUT',
-      63: 'GLOBAL_POSITION_INT_COV',
-      64: 'LOCAL_POSITION_NED_COV',
-      65: 'RC_CHANNELS',
-      66: 'REQUEST_DATA_STREAM',
-      67: 'DATA_STREAM',
-      69: 'MANUAL_CONTROL',
-      70: 'RC_CHANNELS_OVERRIDE',
-      73: 'MISSION_ITEM_INT',
-      74: 'VFR_HUD',
-      75: 'COMMAND_INT',
-      76: 'COMMAND_LONG',
-      77: 'COMMAND_ACK',
-      81: 'MANUAL_SETPOINT',
-      82: 'SET_ATTITUDE_TARGET',
-      83: 'ATTITUDE_TARGET',
-      84: 'SET_POSITION_TARGET_LOCAL_NED',
-      85: 'POSITION_TARGET_LOCAL_NED',
-      86: 'SET_POSITION_TARGET_GLOBAL_INT',
-      87: 'POSITION_TARGET_GLOBAL_INT',
-      89: 'LOCAL_POSITION_NED_SYSTEM_GLOBAL_OFFSET',
-      90: 'HIL_STATE',
-      91: 'HIL_CONTROLS',
-      92: 'HIL_RC_INPUTS_RAW',
-      100: 'OPTICAL_FLOW',
-      101: 'GLOBAL_VISION_POSITION_ESTIMATE',
-      102: 'VISION_POSITION_ESTIMATE',
-      103: 'VISION_SPEED_ESTIMATE',
-      104: 'VICON_POSITION_ESTIMATE',
-      105: 'HIGHRES_IMU',
-      106: 'OPTICAL_FLOW_RAD',
-      107: 'HIL_SENSOR',
-      108: 'SIM_STATE',
-      109: 'RADIO_STATUS',
-      110: 'FILE_TRANSFER_PROTOCOL',
-      111: 'TIMESYNC',
-      112: 'CAMERA_TRIGGER',
-      113: 'HIL_GPS',
-      114: 'HIL_OPTICAL_FLOW',
-      115: 'HIL_STATE_QUATERNION',
-      116: 'SCALED_IMU2',
-      117: 'LOG_REQUEST_LIST',
-      118: 'LOG_ENTRY',
-      119: 'LOG_REQUEST_DATA',
-      120: 'LOG_DATA',
-      121: 'LOG_ERASE',
-      122: 'LOG_REQUEST_END',
-      123: 'GPS_INJECT_DATA',
-      124: 'GPS2_RAW',
-      125: 'POWER_STATUS',
-      126: 'SERIAL_CONTROL',
-      127: 'GPS_RTK',
-      128: 'GPS2_RTK',
-      129: 'SCALED_IMU3',
-      130: 'DATA_TRANSMISSION_HANDSHAKE',
-      131: 'ENCAPSULATED_DATA',
-      132: 'DISTANCE_SENSOR',
-      133: 'TERRAIN_REQUEST',
-      134: 'TERRAIN_DATA',
-      135: 'TERRAIN_CHECK',
-      136: 'TERRAIN_REPORT',
-      137: 'SCALED_PRESSURE2',
-      138: 'ATT_POS_MOCAP',
-      139: 'SET_ACTUATOR_CONTROL_TARGET',
-      140: 'ACTUATOR_CONTROL_TARGET',
-      141: 'ALTITUDE',
-      142: 'RESOURCE_REQUEST',
-      143: 'SCALED_PRESSURE3',
-      144: 'FOLLOW_TARGET',
-      146: 'CONTROL_SYSTEM_STATE',
-      147: 'BATTERY_STATUS',
-      148: 'AUTOPILOT_VERSION',
-      149: 'LANDING_TARGET',
-      230: 'ESTIMATOR_STATUS',
-      231: 'WIND_COV',
-      232: 'GPS_INPUT',
-      233: 'GPS_RTCM_DATA',
-      234: 'HIGH_LATENCY',
-      235: 'HIGH_LATENCY2',
-      241: 'VIBRATION',
-      242: 'HOME_POSITION',
-      243: 'SET_HOME_POSITION',
-      244: 'MESSAGE_INTERVAL',
-      245: 'EXTENDED_SYS_STATE',
-      246: 'ADSB_VEHICLE',
-      247: 'COLLISION',
-      248: 'V2_EXTENSION',
-      249: 'MEMORY_VECT',
-      250: 'DEBUG_VECT',
-      251: 'NAMED_VALUE_FLOAT',
-      252: 'NAMED_VALUE_INT',
-      253: 'STATUSTEXT',
-      254: 'DEBUG',
-      256: 'SETUP_SIGNING',
-      257: 'BUTTON_CHANGE',
-      258: 'PLAY_TUNE',
-      259: 'CAMERA_INFORMATION',
-      260: 'CAMERA_SETTINGS',
-      261: 'STORAGE_INFORMATION',
-      262: 'CAMERA_CAPTURE_STATUS',
-      263: 'CAMERA_IMAGE_CAPTURED',
-      264: 'FLIGHT_INFORMATION',
-      265: 'MOUNT_ORIENTATION',
-      266: 'LOGGING_DATA',
-      267: 'LOGGING_DATA_ACKED',
-      268: 'LOGGING_ACK',
-      269: 'VIDEO_STREAM_INFORMATION',
-      270: 'VIDEO_STREAM_STATUS',
-      299: 'WIFI_CONFIG_AP'
+    return {
+      timestamp: Date.now(),
+      system_id: frame.system_id,
+      component_id: frame.component_id,
+      message_id: frame.message_id,
+      message_name: messageDef.name,
+      sequence: frame.sequence,
+      payload,
+      protocol_version: protocolVersion,
+      checksum: frame.checksum,
+      crc_ok: frame.crc_ok !== false,
+      signature: frame.signature
     };
+  }
+
+  private decodePayload(payload: Uint8Array, fields: FieldDefinition[]): any {
+    const result: any = {};
+    const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    let offset = 0;
+
+    for (const field of fields) {
+      if (offset >= payload.length) {
+        // Set default value for missing fields
+        result[field.name] = this.getDefaultValue(field);
+      } else {
+        const { value, bytesRead } = this.decodeField(view, offset, field);
+        result[field.name] = value;
+        offset += bytesRead;
+      }
+    }
+
+    return result;
+  }
+
+  private getDefaultValue(field: FieldDefinition): any {
+    const isArray = field.arrayLength !== undefined && field.arrayLength > 1;
     
-    return messageNames[messageId] || `UNKNOWN_${messageId}`;
+    if (isArray) {
+      return [];
+    }
+
+    switch (field.type) {
+      case 'uint8_t':
+      case 'int8_t':
+      case 'uint16_t':
+      case 'int16_t':
+      case 'uint32_t':
+      case 'int32_t':
+      case 'float':
+      case 'double':
+        return 0;
+      case 'uint64_t':
+      case 'int64_t':
+        return 0n;
+      case 'char':
+        return '\0';
+      default:
+        if (field.type.startsWith('char[') || field.type.includes('[]')) {
+          return '';
+        }
+        return 0;
+    }
+  }
+
+  private decodeField(view: DataView, offset: number, field: FieldDefinition): { value: any; bytesRead: number } {
+    const isArray = field.arrayLength !== undefined;
+    const arrayLength = field.arrayLength || 1;
+    
+    if (isArray && arrayLength > 1) {
+      const values: any[] = [];
+      let totalBytes = 0;
+      
+      for (let i = 0; i < arrayLength; i++) {
+        if (offset + totalBytes >= view.byteLength) break;
+        const { value, bytesRead } = this.decodeSingleValue(view, offset + totalBytes, field.type);
+        values.push(value);
+        totalBytes += bytesRead;
+      }
+      
+      return { value: values, bytesRead: totalBytes };
+    } else {
+      return this.decodeSingleValue(view, offset, field.type);
+    }
+  }
+
+  private decodeSingleValue(view: DataView, offset: number, type: string): { value: any; bytesRead: number } {
+    try {
+      switch (type) {
+        case 'uint8_t':
+          return { value: view.getUint8(offset), bytesRead: 1 };
+        case 'int8_t':
+          return { value: view.getInt8(offset), bytesRead: 1 };
+        case 'uint16_t':
+          return { value: view.getUint16(offset, true), bytesRead: 2 };
+        case 'int16_t':
+          return { value: view.getInt16(offset, true), bytesRead: 2 };
+        case 'uint32_t':
+          return { value: view.getUint32(offset, true), bytesRead: 4 };
+        case 'int32_t':
+          return { value: view.getInt32(offset, true), bytesRead: 4 };
+        case 'uint64_t':
+          return { value: view.getBigUint64(offset, true), bytesRead: 8 };
+        case 'int64_t':
+          return { value: view.getBigInt64(offset, true), bytesRead: 8 };
+        case 'float':
+          return { value: view.getFloat32(offset, true), bytesRead: 4 };
+        case 'double':
+          return { value: view.getFloat64(offset, true), bytesRead: 8 };
+        case 'char': {
+          const charCode = view.getUint8(offset);
+          return { value: charCode === 0 ? '\0' : String.fromCharCode(charCode), bytesRead: 1 };
+        }
+        default:
+          if (type.startsWith('char[') && type.endsWith(']')) {
+            const length = parseInt(type.slice(5, -1));
+            const chars: string[] = [];
+            for (let i = 0; i < length && offset + i < view.byteLength; i++) {
+              const charCode = view.getUint8(offset + i);
+              if (charCode === 0) break;
+              chars.push(String.fromCharCode(charCode));
+            }
+            return { value: chars.join(''), bytesRead: length };
+          } else if (type.includes('[') && type.includes(']')) {
+            const baseType = type.substring(0, type.indexOf('['));
+            const arrayLength = parseInt(type.substring(type.indexOf('[') + 1, type.indexOf(']')));
+            const values: any[] = [];
+            let totalBytes = 0;
+            
+            for (let i = 0; i < arrayLength; i++) {
+              if (offset + totalBytes >= view.byteLength) break;
+              const { value, bytesRead } = this.decodeSingleValue(view, offset + totalBytes, baseType);
+              values.push(value);
+              totalBytes += bytesRead;
+            }
+            
+            return { value: values, bytesRead: totalBytes };
+          }
+          return { value: view.getUint8(offset), bytesRead: 1 };
+      }
+    } catch (error) {
+      return { value: 0, bytesRead: 1 };
+    }
+  }
+
+  /**
+   * Load all available generated message definitions from built-in dialects
+   * This enables decoding of 319+ messages instead of just basic ones
+   */
+  public async loadGeneratedDefinitions(): Promise<void> {
+    await this.initializeFromGeneratedDefinitions();
+  }
+
+  private async initializeFromGeneratedDefinitions(): Promise<void> {
+    try {
+      // Load decoder definitions from dist folder
+      const dialects = ['common', 'ardupilotmega', 'minimal'];
+      const allDefinitions = new Map<number, MessageDefinition>();
+      
+      for (const dialectName of dialects) {
+        try {
+          const { MESSAGE_DEFINITIONS } = await import(`../../dist/decoders/${dialectName}`);
+          for (const def of MESSAGE_DEFINITIONS) {
+            if (!allDefinitions.has(def.id)) {
+              allDefinitions.set(def.id, def);
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to load ${dialectName} decoder definitions:`, error);
+        }
+      }
+      
+      this.messageDefinitions = allDefinitions;
+      this.definitionsLoaded = true;
+      console.log(`Loaded ${this.messageDefinitions.size} message definitions from generated decoders`);
+    } catch (error) {
+      console.error('Failed to load generated definitions:', error);
+      this.definitionsLoaded = false;
+    }
+  }
+
+  public addCustomMessageDefinition(id: number, name: string, fields: FieldDefinition[]): void {
+    this.messageDefinitions.set(id, { id, name, fields });
+  }
+
+  public getMessageDefinition(id: number): MessageDefinition | undefined {
+    return this.messageDefinitions.get(id);
+  }
+
+  public getSupportedMessageIds(): number[] {
+    return Array.from(this.messageDefinitions.keys()).sort((a, b) => a - b);
+  }
+
+  public isDefinitionsLoaded(): boolean {
+    return this.definitionsLoaded;
+  }
+
+  /**
+   * Wait for definitions to be loaded before proceeding
+   * Returns immediately if already loaded
+   */
+  public async waitForDefinitions(): Promise<void> {
+    if (this.definitionsLoaded) {
+      return;
+    }
+    
+    // Wait a bit for async loading to complete
+    return new Promise((resolve) => {
+      const checkLoaded = () => {
+        if (this.definitionsLoaded) {
+          resolve();
+        } else {
+          setTimeout(checkLoaded, 10);
+        }
+      };
+      checkLoaded();
+    });
+  }
+
+  /**
+   * Factory method to create decoder with all generated definitions loaded
+   * @returns Promise that resolves to decoder with 319+ message definitions
+   */
+  public static async createWithGeneratedDefinitions(): Promise<MAVLinkMessageDecoder> {
+    const decoder = new MAVLinkMessageDecoder();
+    await decoder.loadGeneratedDefinitions();
+    return decoder;
   }
 }

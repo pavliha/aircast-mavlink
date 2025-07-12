@@ -170,6 +170,47 @@ export function is{{ name }}(msg: MAVLinkMessage): msg is MAVLinkMessage<Message
 }
 {{/each}}
 `));
+
+    // Decoder definitions template
+    this.templates.set('decoder', Handlebars.compile(`// Auto-generated decoder definitions for {{{ dialectName }}} dialect
+// Generated from MAVLink XML definitions
+
+interface MessageDefinition {
+  id: number;
+  name: string;
+  fields: FieldDefinition[];
+}
+
+interface FieldDefinition {
+  name: string;
+  type: string;
+  arrayLength?: number;
+  extension?: boolean;
+}
+
+export const {{toUpperCase dialectName}}_MESSAGE_DEFINITIONS: MessageDefinition[] = [
+{{#each messages}}
+  {
+    id: {{ id }},
+    name: '{{{ originalName }}}',
+    fields: [
+{{#each fields}}
+      {
+        name: '{{{ name }}}',
+        type: '{{{ originalType }}}',
+{{#if arrayLength}}
+        arrayLength: {{ arrayLength }},
+{{/if}}
+{{#if extension}}
+        extension: {{ extension }},
+{{/if}}
+      },
+{{/each}}
+    ]
+  },
+{{/each}}
+];
+`));
   }
 
   private registerHelpers(): void {
@@ -183,6 +224,10 @@ export function is{{ name }}(msg: MAVLinkMessage): msg is MAVLinkMessage<Message
 
     Handlebars.registerHelper('ne', (a: unknown, b: unknown) => {
       return a !== b;
+    });
+
+    Handlebars.registerHelper('toUpperCase', (str: string) => {
+      return str.toUpperCase();
     });
   }
 
@@ -225,4 +270,13 @@ export function is{{ name }}(msg: MAVLinkMessage): msg is MAVLinkMessage<Message
     }
     return template(dialect);
   }
+
+  generateDecoder(dialect: TypeScriptDialect): string {
+    const template = this.templates.get('decoder');
+    if (!template) {
+      throw new Error('Decoder template not found');
+    }
+    return template(dialect);
+  }
+
 }

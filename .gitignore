@@ -33,6 +33,5 @@ logs/
 *.log
 
 # Generated types (for testing)
-types/
 mavlink-types/
 test-output/

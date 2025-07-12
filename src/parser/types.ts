@@ -10,6 +10,7 @@ export interface ParsedMAVLinkMessage {
   payload: Record<string, any>;
   protocol_version: 1 | 2;
   checksum: number;
+  crc_ok: boolean;
   signature?: Uint8Array;
 }
 

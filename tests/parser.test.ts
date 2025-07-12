@@ -149,8 +149,11 @@ describe('MAVLinkParser', () => {
   });
 
   describe('parser options', () => {
-    test('should disable CRC validation when configured', () => {
+    test('should disable CRC validation when configured', async () => {
       const parserNoCRC = new MAVLinkParser({ validateCRC: false });
+      
+      // Wait for message definitions to load
+      await (parserNoCRC as any).messageDecoder.waitForDefinitions();
       
       // HEARTBEAT with wrong checksum
       const heartbeatBadCRC = new Uint8Array([

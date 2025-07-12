@@ -56,13 +56,19 @@ export class MAVLinkParser {
         processedBytes += bytesConsumed;
         
         // Validate CRC if enabled
-        if (this.options.validateCRC && !this.validateFrameCRC(frame)) {
-          continue;
+        let crcValid = true;
+        if (this.options.validateCRC) {
+          crcValid = this.validateFrameCRC(frame);
+          if (!crcValid) {
+            console.warn(`CRC validation failed for message ${frame.message_id}`);
+            continue;
+          }
         }
 
         // Decode message
         try {
-          const message = this.messageDecoder.decode(frame);
+          const frameWithCRC = { ...frame, crc_ok: crcValid };
+          const message = this.messageDecoder.decode(frameWithCRC);
           messages.push(message);
         } catch (error) {
           // Message decode error, continue with next frame
@@ -90,11 +96,16 @@ export class MAVLinkParser {
     try {
       const frame = this.frameParser.parseFrame(data);
       
-      if (this.options.validateCRC && !this.validateFrameCRC(frame)) {
-        throw new ParserError('CRC validation failed');
+      let crcValid = true;
+      if (this.options.validateCRC) {
+        crcValid = this.validateFrameCRC(frame);
+        if (!crcValid) {
+          throw new ParserError('CRC validation failed');
+        }
       }
 
-      return this.messageDecoder.decode(frame);
+      const frameWithCRC = { ...frame, crc_ok: crcValid };
+      return this.messageDecoder.decode(frameWithCRC);
     } catch (error) {
       throw new ParserError(`Failed to parse message: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
