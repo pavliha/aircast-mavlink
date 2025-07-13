@@ -21,7 +21,7 @@ export interface ParsedMAVLinkMessage {
   message_id: number;
   message_name: string;
   sequence: number;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   protocol_version: 1 | 2;
   checksum: number;
   crc_ok: boolean;
@@ -158,7 +158,7 @@ interface ParsedMAVLinkMessage {
   message_id: number;
   message_name: string;
   sequence: number;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   protocol_version: 1 | 2;
   checksum: number;
   crc_ok: boolean;
@@ -178,6 +178,8 @@ interface MAVLinkFrame {
   payload: Uint8Array;
   checksum: number;
   signature?: Uint8Array; // v2 only, 13 bytes
+  crc_ok?: boolean;
+  protocol_version?: 1 | 2;
 }
 
 interface MessageDefinition {
@@ -192,6 +194,10 @@ interface FieldDefinition {
   arrayLength?: number;
   extension?: boolean;
 }
+
+type FieldValue = string | number | bigint | boolean | Array<string | number | bigint | boolean>;
+type PayloadObject = Record<string, FieldValue>;
+type DecodedValue = { value: FieldValue; bytesRead: number };
 
 // Base dialect parser class
 abstract class DialectParser {
@@ -242,7 +248,7 @@ abstract class DialectParser {
     return results;
   }
 
-  private tryParseFrame(data: Uint8Array): { frame?: MAVLinkFrame & { crc_ok?: boolean; protocol_version?: 1 | 2 }; bytesConsumed: number } {
+  private tryParseFrame(data: Uint8Array): { frame?: MAVLinkFrame; bytesConsumed: number } {
     if (data.length < 8) {
       return { bytesConsumed: 0 };
     }
@@ -266,7 +272,7 @@ abstract class DialectParser {
     }
 
     let frameOffset = offset;
-    const frame: any = { magic };
+    const frame: Partial<MAVLinkFrame> = { magic };
 
     frameOffset++;
     frame.length = data[frameOffset++];
@@ -308,14 +314,14 @@ abstract class DialectParser {
     frame.crc_ok = true; // Simplified - not doing CRC validation
     frame.protocol_version = isV2 ? 2 : 1;
 
-    return { frame, bytesConsumed: frameOffset - offset };
+    return { frame: frame as MAVLinkFrame, bytesConsumed: frameOffset - offset };
   }
 
   resetBuffer(): void {
     this.buffer = new Uint8Array(0);
   }
 
-  decode(frame: MAVLinkFrame & { crc_ok?: boolean; protocol_version?: 1 | 2 }): ParsedMAVLinkMessage {
+  decode(frame: MAVLinkFrame): ParsedMAVLinkMessage {
     const messageDef = this.messageDefinitions.get(frame.message_id);
     
     const protocolVersion = frame.protocol_version || (frame.magic === 0xFD ? 2 : 1);
@@ -333,7 +339,7 @@ abstract class DialectParser {
         },
         protocol_version: protocolVersion,
         checksum: frame.checksum,
-        crc_ok: frame.crc_ok !== false,
+        crc_ok: frame.crc_ok ?? true,
         signature: frame.signature,
         dialect: this.dialectName
       };
@@ -351,14 +357,14 @@ abstract class DialectParser {
       payload,
       protocol_version: protocolVersion,
       checksum: frame.checksum,
-      crc_ok: frame.crc_ok !== false,
+      crc_ok: frame.crc_ok ?? true,
       signature: frame.signature,
       dialect: this.dialectName
     };
   }
 
-  private decodePayload(payload: Uint8Array, fields: FieldDefinition[]): any {
-    const result: any = {};
+  private decodePayload(payload: Uint8Array, fields: FieldDefinition[]): PayloadObject {
+    const result: PayloadObject = {};
     const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
     let offset = 0;
 
@@ -375,7 +381,7 @@ abstract class DialectParser {
     return result;
   }
 
-  private getDefaultValue(field: FieldDefinition): any {
+  private getDefaultValue(field: FieldDefinition): FieldValue {
     const isArray = field.arrayLength !== undefined && field.arrayLength > 1;
     
     if (isArray) {
@@ -405,12 +411,12 @@ abstract class DialectParser {
     }
   }
 
-  private decodeField(view: DataView, offset: number, field: FieldDefinition): { value: any; bytesRead: number } {
+  private decodeField(view: DataView, offset: number, field: FieldDefinition): DecodedValue {
     const isArray = field.arrayLength !== undefined;
     const arrayLength = field.arrayLength || 1;
     
     if (isArray && arrayLength > 1) {
-      const values: any[] = [];
+      const values: (string | number | bigint | boolean)[] = [];
       let totalBytes = 0;
       
       // Strip array notation from type to avoid double processing
@@ -422,7 +428,9 @@ abstract class DialectParser {
       for (let i = 0; i < arrayLength; i++) {
         if (offset + totalBytes >= view.byteLength) break;
         const { value, bytesRead } = this.decodeSingleValue(view, offset + totalBytes, baseType);
-        values.push(value);
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint' || typeof value === 'boolean') {
+          values.push(value);
+        }
         totalBytes += bytesRead;
       }
       
@@ -432,7 +440,7 @@ abstract class DialectParser {
     }
   }
 
-  private decodeSingleValue(view: DataView, offset: number, type: string): { value: any; bytesRead: number } {
+  private decodeSingleValue(view: DataView, offset: number, type: string): DecodedValue {
     try {
       switch (type) {
         case 'uint8_t':
@@ -472,13 +480,15 @@ abstract class DialectParser {
           } else if (type.includes('[') && type.includes(']')) {
             const baseType = type.substring(0, type.indexOf('['));
             const arrayLength = parseInt(type.substring(type.indexOf('[') + 1, type.indexOf(']')));
-            const values: any[] = [];
+            const values: (string | number | bigint | boolean)[] = [];
             let totalBytes = 0;
             
             for (let i = 0; i < arrayLength; i++) {
               if (offset + totalBytes >= view.byteLength) break;
               const { value, bytesRead } = this.decodeSingleValue(view, offset + totalBytes, baseType);
-              values.push(value);
+              if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint' || typeof value === 'boolean') {
+                values.push(value);
+              }
               totalBytes += bytesRead;
             }
             

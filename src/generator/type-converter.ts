@@ -139,7 +139,7 @@ export class TypeConverter {
     const tsField: TypeScriptField = {
       name: this.convertFieldName(fieldDef.name),
       type: this.convertFieldType(fieldDef.type, fieldDef.enum, enums),
-      originalType: fieldDef.type,
+      originalType: originalType,
       description: this.parseDescription(fieldDef.description || ''),
       optional: fieldDef.extension || false,
       arrayLength,
