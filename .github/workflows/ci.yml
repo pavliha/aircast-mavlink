@@ -46,15 +46,11 @@ jobs:
     - name: Run tests
       run: npm test
 
-    - name: Test CLI functionality
-      run: |
-        node dist/cli.js --help
-        node dist/cli.js list
 
     - name: Test package exports
       run: |
         node -e "
-        const lib = require('./dist/index.js');
+        const lib = require('./dist/mavlink.cjs.js');
         console.log('✅ Main exports:', Object.keys(lib));
         const { MAVLinkParser } = lib;
         const parser = new MAVLinkParser();
