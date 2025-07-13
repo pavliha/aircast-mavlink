@@ -14,13 +14,21 @@ export class TemplateEngine {
     this.templates.set('types', Handlebars.compile(`// Auto-generated TypeScript types for {{ dialectName }} dialect
 // Generated from MAVLink XML definitions
 
-export interface MAVLinkMessage<Content = unknown> {
+export interface ParsedMAVLinkMessage {
   timestamp: number;
   system_id: number;
   component_id: number;
-  type: string;
-  payload: Content;
+  message_id: number;
+  message_name: string;
+  sequence: number;
+  payload: Record<string, any>;
+  protocol_version: 1 | 2;
+  checksum: number;
+  crc_ok: boolean;
+  signature?: Uint8Array;
+  dialect?: string;
 }
+
 
 {{#unless includeEnums}}
 {{#each enums}}
@@ -66,7 +74,7 @@ export {};
     // Messages template
     this.templates.set('messages', Handlebars.compile(`// Auto-generated TypeScript message interfaces for {{ dialectName }} dialect
 
-import { MAVLinkMessage } from './types';
+import { ParsedMAVLinkMessage } from './types';
 {{#if includeEnums}}
 {{#if enums.length}}
 import type {
@@ -108,15 +116,12 @@ export interface MessageTypeMap {
 }
 
 // Union type of all message types
-export type AnyMessage = 
-{{#each messages}}
-  | MAVLinkMessage<Message{{ name }}>
-{{/each}};
+export type AnyMessage = ParsedMAVLinkMessage;
 
 // Type guard functions
 {{#each messages}}
-export function is{{ name }}(msg: MAVLinkMessage): msg is MAVLinkMessage<Message{{ name }}> {
-  return msg.type === '{{ originalName }}';
+export function is{{ name }}(msg: ParsedMAVLinkMessage): msg is ParsedMAVLinkMessage & { payload: Message{{ name }} } {
+  return msg.message_name === '{{ originalName }}';
 }
 {{/each}}
 `));
@@ -136,65 +141,9 @@ export * from './decoder';
 `));
 
     // Single file template
-    this.templates.set('single', Handlebars.compile(`// Auto-generated TypeScript types for {{ dialectName }} dialect
-// Generated from MAVLink XML definitions
+    this.templates.set('single', Handlebars.compile(`{{{ generateTypes this }}}
 
-export interface MAVLinkMessage<Content = unknown> {
-  timestamp: number;
-  system_id: number;
-  component_id: number;
-  type: string;
-  payload: Content;
-}
-
-// Enums
-{{#each enums}}
-{{#each description}}
-// {{ this }}
-{{/each}}
-export type {{ name }} =
-{{#each values}}
-  | {{ value }}{{#if description}} // {{ name }} - {{ join description " " }}{{/if}}
-{{/each}}
-  | number;
-
-{{/each}}
-
-// Messages
-{{#each messages}}
-{{#each description}}
-// {{ this }}
-{{/each}}
-export interface Message{{ name }} {
-{{#each fields}}
-{{#each description}}
-  // {{ this }}
-{{/each}}
-  {{ name }}{{#if optional}}?{{/if}}: {{ type }};
-{{/each}}
-}
-
-{{/each}}
-
-// Message type map for type-safe message handling
-export interface MessageTypeMap {
-{{#each messages}}
-  {{ originalName }}: Message{{ name }};
-{{/each}}
-}
-
-// Union type of all message types
-export type AnyMessage = 
-{{#each messages}}
-  | MAVLinkMessage<Message{{ name }}>
-{{/each}};
-
-// Type guard functions
-{{#each messages}}
-export function is{{ name }}(msg: MAVLinkMessage): msg is MAVLinkMessage<Message{{ name }}> {
-  return msg.type === '{{ originalName }}';
-}
-{{/each}}
+{{{ generateMessages this }}}
 `));
 
     // Combined decoder and parser template
@@ -248,12 +197,123 @@ interface FieldDefinition {
 abstract class DialectParser {
   protected messageDefinitions: Map<number, MessageDefinition> = new Map();
   protected dialectName: string;
+  private buffer: Uint8Array = new Uint8Array(0);
 
   constructor(dialectName: string) {
     this.dialectName = dialectName;
   }
 
   abstract loadDefinitions(): Promise<void>;
+
+  parseBytes(data: Uint8Array): ParsedMAVLinkMessage[] {
+    const results: ParsedMAVLinkMessage[] = [];
+
+    if (!data || data.length === 0) {
+      return results;
+    }
+
+    // Append new data to buffer
+    const newBuffer = new Uint8Array(this.buffer.length + data.length);
+    newBuffer.set(this.buffer);
+    newBuffer.set(data, this.buffer.length);
+    this.buffer = newBuffer;
+
+    let offset = 0;
+    
+    // Parse MAVLink frames from buffer
+    while (offset < this.buffer.length) {
+      const frameResult = this.tryParseFrame(this.buffer.slice(offset));
+      
+      if (frameResult.frame) {
+        const message = this.decode(frameResult.frame);
+        results.push(message);
+        offset += frameResult.bytesConsumed;
+      } else if (frameResult.bytesConsumed > 0) {
+        // Skip invalid bytes
+        offset += frameResult.bytesConsumed;
+      } else {
+        // Not enough data for a complete frame
+        break;
+      }
+    }
+
+    // Keep remaining data in buffer
+    this.buffer = this.buffer.slice(offset);
+    return results;
+  }
+
+  private tryParseFrame(data: Uint8Array): { frame?: MAVLinkFrame & { crc_ok?: boolean; protocol_version?: 1 | 2 }; bytesConsumed: number } {
+    if (data.length < 8) {
+      return { bytesConsumed: 0 };
+    }
+
+    let offset = 0;
+    
+    // Find magic byte
+    while (offset < data.length && data[offset] !== 0xFE && data[offset] !== 0xFD) {
+      offset++;
+    }
+
+    if (offset === data.length) {
+      return { bytesConsumed: data.length };
+    }
+
+    const magic = data[offset];
+    const isV2 = magic === 0xFD;
+
+    if (data.length - offset < (isV2 ? 12 : 8)) {
+      return { bytesConsumed: offset };
+    }
+
+    let frameOffset = offset;
+    const frame: any = { magic };
+
+    frameOffset++;
+    frame.length = data[frameOffset++];
+
+    if (isV2) {
+      frame.incompatible_flags = data[frameOffset++];
+      frame.compatible_flags = data[frameOffset++];
+    }
+
+    frame.sequence = data[frameOffset++];
+    frame.system_id = data[frameOffset++];
+    frame.component_id = data[frameOffset++];
+    frame.message_id = data[frameOffset++];
+
+    if (isV2 && data.length - frameOffset >= 2) {
+      frame.message_id |= (data[frameOffset++] << 8);
+      frame.message_id |= (data[frameOffset++] << 16);
+    }
+
+    const totalLength = frameOffset - offset + frame.length + 2; // +2 for checksum
+    if (data.length - offset < totalLength) {
+      return { bytesConsumed: offset };
+    }
+
+    frame.payload = data.slice(frameOffset, frameOffset + frame.length);
+    frameOffset += frame.length;
+
+    frame.checksum = data[frameOffset] | (data[frameOffset + 1] << 8);
+    frameOffset += 2;
+
+    // Handle signature for v2
+    if (isV2 && frame.incompatible_flags && (frame.incompatible_flags & 0x01)) {
+      if (data.length - frameOffset >= 13) {
+        frame.signature = data.slice(frameOffset, frameOffset + 13);
+        frameOffset += 13;
+      }
+    }
+
+    frame.crc_ok = true; // Simplified - not doing CRC validation
+    frame.protocol_version = isV2 ? 2 : 1;
+
+    return { frame, bytesConsumed: frameOffset - offset };
+  }
+
+  resetBuffer(): void {
+    this.buffer = new Uint8Array(0);
+  }
 
   decode(frame: MAVLinkFrame & { crc_ok?: boolean; protocol_version?: 1 | 2 }): ParsedMAVLinkMessage {
     const messageDef = this.messageDefinitions.get(frame.message_id);
@@ -353,9 +413,15 @@ abstract class DialectParser {
       const values: any[] = [];
       let totalBytes = 0;
       
+      // Strip array notation from type to avoid double processing
+      let baseType = field.type;
+      if (baseType.includes('[') && baseType.includes(']')) {
+        baseType = baseType.substring(0, baseType.indexOf('['));
+      }
+      
       for (let i = 0; i < arrayLength; i++) {
         if (offset + totalBytes >= view.byteLength) break;
-        const { value, bytesRead } = this.decodeSingleValue(view, offset + totalBytes, field.type);
+        const { value, bytesRead } = this.decodeSingleValue(view, offset + totalBytes, baseType);
         values.push(value);
         totalBytes += bytesRead;
       }
@@ -513,6 +579,14 @@ export class {{capitalize dialectName}}Parser extends DialectParser {
     Handlebars.registerHelper('capitalize', (str: string) => {
       return str.charAt(0).toUpperCase() + str.slice(1);
     });
+
+    Handlebars.registerHelper('generateTypes', (dialect: TypeScriptDialect) => {
+      return this.generateTypes(dialect, false);
+    });
+
+    Handlebars.registerHelper('generateMessages', (dialect: TypeScriptDialect) => {
+      return this.generateMessages(dialect, false);
+    });
   }
 
   generateTypes(dialect: TypeScriptDialect, includeEnums: boolean = true): string {
@@ -552,7 +626,12 @@ export class {{capitalize dialectName}}Parser extends DialectParser {
     if (!template) {
       throw new Error('Single template not found');
     }
-    return template(dialect);
+    const context = {
+      ...dialect,
+      generateTypes: () => this.generateTypes(dialect, false),
+      generateMessages: () => this.generateMessages(dialect, false)
+    };
+    return template(context);
   }
 
   generateDecoder(dialect: TypeScriptDialect): string {

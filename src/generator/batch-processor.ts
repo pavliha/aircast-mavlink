@@ -113,8 +113,6 @@ export class BatchProcessor {
 
 ${dialectNames.map(name => `export * as ${name} from './${name}';`).join('\n')}
 
-// Convenience re-exports
-export { MAVLinkMessage, MessageTypeMap, AnyMessage } from './common/types';
 `;
 
     await fs.writeFile(join(outputDir, 'index.ts'), indexContent);
