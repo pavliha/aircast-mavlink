@@ -86,14 +86,36 @@ describe('TemplateEngine', () => {
   });
 
   describe('generateIndex', () => {
-    it('should generate index file with exports', () => {
-      const result = engine.generateIndex(mockDialect);
+    it('should generate index file with exports when enums are included', () => {
+      const result = engine.generateIndex(mockDialect, true);
       
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
       expect(result).toContain('export');
       expect(result).toContain('./types');
       expect(result).toContain('./enums');
+      expect(result).toContain('./messages');
+    });
+
+    it('should generate index file without enums export when not included', () => {
+      const result = engine.generateIndex(mockDialect, false);
+      
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('string');
+      expect(result).toContain('export');
+      expect(result).toContain('./types');
+      expect(result).not.toContain('./enums');
+      expect(result).toContain('./messages');
+    });
+
+    it('should handle dialects with no enums', () => {
+      const emptyEnumsDialect = { ...mockDialect, enums: [] };
+      const result = engine.generateIndex(emptyEnumsDialect, false);
+      
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('string');
+      expect(result).toContain('./types');
+      expect(result).not.toContain('./enums');
       expect(result).toContain('./messages');
     });
   });
