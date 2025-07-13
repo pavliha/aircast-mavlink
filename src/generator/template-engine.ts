@@ -22,6 +22,7 @@ export interface MAVLinkMessage<Content = unknown> {
   payload: Content;
 }
 
+{{#unless includeEnums}}
 {{#each enums}}
 {{#each description}}
 // {{ this }}
@@ -33,6 +34,7 @@ export type {{ name }} =
   | number;
 
 {{/each}}
+{{/unless}}
 `));
 
     // Enums template
@@ -51,6 +53,9 @@ export enum {{ name }}Enum {
 {{/each}}
 }
 
+// Type alias for compatibility
+export type {{ name }} = {{ name }}Enum;
+
 {{/each}}
 `));
 
@@ -58,11 +63,19 @@ export enum {{ name }}Enum {
     this.templates.set('messages', Handlebars.compile(`// Auto-generated TypeScript message interfaces for {{ dialectName }} dialect
 
 import { MAVLinkMessage } from './types';
+{{#if includeEnums}}
+import type {
+{{#each enums}}
+  {{ name }},
+{{/each}}
+} from './enums';
+{{else}}
 import type {
 {{#each enums}}
   {{ name }},
 {{/each}}
 } from './types';
+{{/if}}
 
 {{#each messages}}
 {{#each description}}
@@ -105,8 +118,11 @@ export function is{{ name }}(msg: MAVLinkMessage): msg is MAVLinkMessage<Message
 // Exports all dialect types
 
 export * from './types';
+{{#if includeEnums}}
 export * from './enums';
+{{/if}}
 export * from './messages';
+export * from './decoder';
 `));
 
     // Single file template
@@ -231,12 +247,12 @@ export const {{toUpperCase dialectName}}_MESSAGE_DEFINITIONS: MessageDefinition[
     });
   }
 
-  generateTypes(dialect: TypeScriptDialect): string {
+  generateTypes(dialect: TypeScriptDialect, includeEnums: boolean = true): string {
     const template = this.templates.get('types');
     if (!template) {
       throw new Error('Types template not found');
     }
-    return template(dialect);
+    return template({ ...dialect, includeEnums });
   }
 
   generateEnums(dialect: TypeScriptDialect): string {
@@ -247,12 +263,12 @@ export const {{toUpperCase dialectName}}_MESSAGE_DEFINITIONS: MessageDefinition[
     return template(dialect);
   }
 
-  generateMessages(dialect: TypeScriptDialect): string {
+  generateMessages(dialect: TypeScriptDialect, includeEnums: boolean = false): string {
     const template = this.templates.get('messages');
     if (!template) {
       throw new Error('Messages template not found');
     }
-    return template(dialect);
+    return template({ ...dialect, includeEnums });
   }
 
   generateIndex(dialect: TypeScriptDialect, includeEnums: boolean = false): string {

@@ -32,14 +32,31 @@ export class TypeConverter {
       messages: []
     };
 
-    // Convert enums
+    // Convert enums with deduplication
     if (definition.enums) {
+      const enumMap = new Map<string, TypeScriptEnum>();
+      
       for (const enumDef of definition.enums) {
         const tsEnum = this.convertEnum(enumDef);
         if (tsEnum) {
-          tsDialect.enums.push(tsEnum);
+          const existingEnum = enumMap.get(tsEnum.name);
+          if (existingEnum) {
+            // Merge values from duplicate enum
+            for (const value of tsEnum.values) {
+              const existingValue = existingEnum.values.find(v => v.name === value.name);
+              if (!existingValue) {
+                existingEnum.values.push(value);
+              }
+            }
+            // Merge descriptions
+            existingEnum.description = [...existingEnum.description, ...tsEnum.description];
+          } else {
+            enumMap.set(tsEnum.name, tsEnum);
+          }
         }
       }
+      
+      tsDialect.enums = Array.from(enumMap.values());
     }
 
     // Convert messages
@@ -126,8 +143,9 @@ export class TypeConverter {
   }
 
   private convertFieldName(name: string): string {
-    // Convert snake_case to PascalCase
-    return name.split('_')
+    // Convert snake_case to camelCase
+    const words = name.split('_');
+    return words[0].toLowerCase() + words.slice(1)
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join('');
   }

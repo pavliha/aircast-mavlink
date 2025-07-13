@@ -205,33 +205,108 @@ export class MAVLinkMessageDecoder {
 
   private async initializeFromGeneratedDefinitions(): Promise<void> {
     try {
-      // Load decoder definitions from dist folder
-      const dialects = ['common', 'ardupilotmega', 'minimal'];
+      // Load decoder definitions using static imports for better bundling support
       const allDefinitions = new Map<number, MessageDefinition>();
       
-      for (const dialectName of dialects) {
-        try {
-          const decoderModule = await import(`../../dist/dialects/${dialectName}/decoder`);
-          const exportName = `${dialectName.toUpperCase()}_MESSAGE_DEFINITIONS`;
-          const MESSAGE_DEFINITIONS = decoderModule[exportName];
-          if (MESSAGE_DEFINITIONS) {
-            for (const def of MESSAGE_DEFINITIONS) {
-              if (!allDefinitions.has(def.id)) {
-                allDefinitions.set(def.id, def);
-              }
+      // Get available dialects dynamically
+      const availableDialects = this.getAvailableDialects();
+      
+      // Import decoder modules for all available dialects
+      const decoderModules = await Promise.allSettled(
+        availableDialects.map(dialectName => this.loadDialectDecoder(dialectName))
+      );
+      
+      for (const result of decoderModules) {
+        if (result.status === 'fulfilled' && result.value) {
+          const { dialectName, definitions } = result.value;
+          for (const def of definitions) {
+            if (!allDefinitions.has(def.id)) {
+              allDefinitions.set(def.id, def);
             }
           }
-        } catch (error) {
-          console.warn(`Failed to load ${dialectName} decoder definitions:`, error);
         }
       }
       
       this.messageDefinitions = allDefinitions;
       this.definitionsLoaded = true;
-      console.log(`Loaded ${this.messageDefinitions.size} message definitions from generated decoders`);
+      console.log(`Loaded ${this.messageDefinitions.size} message definitions from ${availableDialects.length} dialects: ${availableDialects.join(', ')}`);
     } catch (error) {
       console.error('Failed to load generated definitions:', error);
       this.definitionsLoaded = false;
+    }
+  }
+
+  private getAvailableDialects(): string[] {
+    // Return all available dialects that are generated
+    const dialects = [
+      'common', 
+      'ardupilotmega', 
+      'minimal', 
+      'standard',
+      'test',
+      'paparazzi',
+      'python_array_test'
+    ];
+    
+    return dialects;
+  }
+
+  private async loadDialectDecoder(dialectName: string): Promise<{ dialectName: string; definitions: MessageDefinition[] } | null> {
+    try {
+      let definitions: MessageDefinition[];
+      
+      // Import decoder modules directly from generated source
+      // Only include cases for dialects that are actually generated
+      switch (dialectName) {
+        case 'common': {
+          const { COMMON_MESSAGE_DEFINITIONS } = await import('../generated/dialects/common/decoder');
+          definitions = COMMON_MESSAGE_DEFINITIONS;
+          break;
+        }
+        case 'ardupilotmega': {
+          const { ARDUPILOTMEGA_MESSAGE_DEFINITIONS } = await import('../generated/dialects/ardupilotmega/decoder');
+          definitions = ARDUPILOTMEGA_MESSAGE_DEFINITIONS;
+          break;
+        }
+        case 'minimal': {
+          const { MINIMAL_MESSAGE_DEFINITIONS } = await import('../generated/dialects/minimal/decoder');
+          definitions = MINIMAL_MESSAGE_DEFINITIONS;
+          break;
+        }
+        case 'standard': {
+          const { STANDARD_MESSAGE_DEFINITIONS } = await import('../generated/dialects/standard/decoder');
+          definitions = STANDARD_MESSAGE_DEFINITIONS;
+          break;
+        }
+        case 'test': {
+          const { TEST_MESSAGE_DEFINITIONS } = await import('../generated/dialects/test/decoder');
+          definitions = TEST_MESSAGE_DEFINITIONS;
+          break;
+        }
+        case 'paparazzi': {
+          const { PAPARAZZI_MESSAGE_DEFINITIONS } = await import('../generated/dialects/paparazzi/decoder');
+          definitions = PAPARAZZI_MESSAGE_DEFINITIONS;
+          break;
+        }
+        case 'python_array_test': {
+          const { PYTHONARRAY_TEST_MESSAGE_DEFINITIONS } = await import('../generated/dialects/python_array_test/decoder');
+          definitions = PYTHONARRAY_TEST_MESSAGE_DEFINITIONS;
+          break;
+        }
+        default:
+          console.warn(`Unknown dialect: ${dialectName}`);
+          return null;
+      }
+      
+      if (!definitions || !Array.isArray(definitions)) {
+        console.warn(`No message definitions found for dialect: ${dialectName}`);
+        return null;
+      }
+      
+      return { dialectName, definitions };
+    } catch (error) {
+      console.warn(`Failed to load ${dialectName} decoder definitions:`, error);
+      return null;
     }
   }
 
