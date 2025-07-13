@@ -57,6 +57,10 @@ export enum {{ name }}Enum {
 export type {{ name }} = {{ name }}Enum;
 
 {{/each}}
+{{#unless enums.length}}
+// This dialect has no enums defined
+export {};
+{{/unless}}
 `));
 
     // Messages template
@@ -64,17 +68,21 @@ export type {{ name }} = {{ name }}Enum;
 
 import { MAVLinkMessage } from './types';
 {{#if includeEnums}}
+{{#if enums.length}}
 import type {
 {{#each enums}}
   {{ name }},
 {{/each}}
 } from './enums';
+{{/if}}
 {{else}}
+{{#if enums.length}}
 import type {
 {{#each enums}}
   {{ name }},
 {{/each}}
 } from './types';
+{{/if}}
 {{/if}}
 
 {{#each messages}}
@@ -119,7 +127,9 @@ export function is{{ name }}(msg: MAVLinkMessage): msg is MAVLinkMessage<Message
 
 export * from './types';
 {{#if includeEnums}}
+{{#if enums.length}}
 export * from './enums';
+{{/if}}
 {{/if}}
 export * from './messages';
 export * from './decoder';

@@ -62,6 +62,8 @@ describe('TemplateEngine', () => {
       
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
+      expect(result).toContain('// This dialect has no enums defined');
+      expect(result).toContain('export {};');
     });
   });
 
@@ -82,6 +84,15 @@ describe('TemplateEngine', () => {
       
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
+    });
+
+    it('should not import from enums when dialect has no enums', () => {
+      const emptyEnumsDialect = { ...mockDialect, enums: [], messages: mockDialect.messages };
+      const result = engine.generateMessages(emptyEnumsDialect, true);
+      
+      expect(result).toBeDefined();
+      expect(result).not.toContain("} from './enums';");
+      expect(result).not.toContain("import type {");
     });
   });
 
@@ -111,6 +122,17 @@ describe('TemplateEngine', () => {
     it('should handle dialects with no enums', () => {
       const emptyEnumsDialect = { ...mockDialect, enums: [] };
       const result = engine.generateIndex(emptyEnumsDialect, false);
+      
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('string');
+      expect(result).toContain('./types');
+      expect(result).not.toContain('./enums');
+      expect(result).toContain('./messages');
+    });
+
+    it('should not export enums when includeEnums is true but no enums exist', () => {
+      const emptyEnumsDialect = { ...mockDialect, enums: [] };
+      const result = engine.generateIndex(emptyEnumsDialect, true);
       
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
