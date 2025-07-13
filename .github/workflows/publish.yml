@@ -76,8 +76,12 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Usage" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`typescript" >> $GITHUB_STEP_SUMMARY
+        echo "// Main parser and utilities" >> $GITHUB_STEP_SUMMARY
         echo "import { MAVLinkParser } from '$PACKAGE_NAME';" >> $GITHUB_STEP_SUMMARY
-        echo "import * as CommonTypes from '$PACKAGE_NAME/types/common';" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "// Individual dialects" >> $GITHUB_STEP_SUMMARY
+        echo "import { MAV_CMDEnum } from '$PACKAGE_NAME/dialects/common';" >> $GITHUB_STEP_SUMMARY
+        echo "import { SomeEnum } from '$PACKAGE_NAME/dialects/ardupilotmega';" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
   verify-publication:
@@ -111,6 +115,18 @@ jobs:
         const lib = require('$PACKAGE_NAME');
         console.log('✅ Package installed and importable');
         console.log('Available exports:', Object.keys(lib));
+        
+        // Test dialect imports
+        const dialects = ['common', 'ardupilotmega', 'minimal', 'standard'];
+        dialects.forEach(dialect => {
+          try {
+            const dialectModule = require(\`$PACKAGE_NAME/dialects/\${dialect}\`);
+            console.log(\`✅ \${dialect} dialect import successful\`);
+          } catch (error) {
+            console.error(\`❌ Failed to import \${dialect} dialect\`);
+            process.exit(1);
+          }
+        });
         "
         
         echo "✅ Package verification successful"

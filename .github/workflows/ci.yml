@@ -30,14 +30,15 @@ jobs:
     - name: Build project
       run: npm run build
 
-    - name: Verify decoder files exist
+    - name: Verify bundled dialect files exist
       run: |
-        echo "Checking for decoder files..."
+        echo "Checking for bundled dialect files..."
         ls -la dist/dialects/
-        test -f dist/dialects/common/decoder.js || (echo "common/decoder.js not found" && exit 1)
-        test -f dist/dialects/ardupilotmega/decoder.js || (echo "ardupilotmega/decoder.js not found" && exit 1)
-        test -f dist/dialects/minimal/decoder.js || (echo "minimal/decoder.js not found" && exit 1)
-        echo "All decoder files found!"
+        for dialect in common ardupilotmega minimal standard test paparazzi python_array_test; do
+          test -f dist/dialects/$dialect/index.js || (echo "$dialect/index.js not found" && exit 1)
+          test -f dist/dialects/$dialect/index.d.ts || (echo "$dialect/index.d.ts not found" && exit 1)
+        done
+        echo "All bundled dialect files found!"
 
     - name: Run linter
       run: npm run lint
@@ -60,21 +61,22 @@ jobs:
         console.log('✅ Package working correctly');
         "
 
-    - name: Verify generated types
+    - name: Test dialect imports
       run: |
         node -e "
-        console.log('Checking dialect structure...');
-        const fs = require('fs');
-        ['common', 'ardupilotmega', 'minimal'].forEach(dialect => {
-          const dir = \`./dist/dialects/\${dialect}\`;
-          if (!fs.existsSync(\`\${dir}/index.d.ts\`)) throw new Error(\`Missing \${dialect}/index.d.ts\`);
-          if (!fs.existsSync(\`\${dir}/types.d.ts\`)) throw new Error(\`Missing \${dialect}/types.d.ts\`);
-          if (!fs.existsSync(\`\${dir}/messages.d.ts\`)) throw new Error(\`Missing \${dialect}/messages.d.ts\`);
-          if (!fs.existsSync(\`\${dir}/enums.d.ts\`)) throw new Error(\`Missing \${dialect}/enums.d.ts\`);
-          if (!fs.existsSync(\`\${dir}/decoder.js\`)) throw new Error(\`Missing \${dialect}/decoder.js\`);
-          console.log(\`✅ \${dialect} dialect structure complete\`);
+        console.log('Testing dialect imports...');
+        const dialects = ['common', 'ardupilotmega', 'minimal', 'standard', 'test', 'paparazzi', 'python_array_test'];
+        dialects.forEach(async (dialect) => {
+          try {
+            const dialectModule = require(\`./dist/dialects/\${dialect}/index.js\`);
+            console.log(\`✅ \${dialect} dialect imported successfully\`);
+            console.log(\`   Exports: \${Object.keys(dialectModule).length} items\`);
+          } catch (error) {
+            console.error(\`❌ Failed to import \${dialect}:, error.message\`);
+            process.exit(1);
+          }
         });
-        console.log('✅ All dialect structures verified');
+        console.log('✅ All dialects imported successfully');
         "
 
   build-check:
@@ -97,9 +99,17 @@ jobs:
     - name: Build project
       run: npm run build
 
-    - name: Check package size
+    - name: Check package size and structure
       run: |
         npm pack --dry-run
+        echo "Package structure:"
+        echo "Main bundles:"
+        ls -la dist/mavlink.*.js
+        echo "Dialect bundles:"
+        ls -la dist/dialects/*/index.js
+        echo "TypeScript declarations:"
+        ls -la dist/index.d.ts
+        ls -la dist/dialects/*/index.d.ts
         echo "Package ready for publishing"
 
     - name: Upload build artifacts
