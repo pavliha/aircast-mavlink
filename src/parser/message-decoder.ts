@@ -218,7 +218,7 @@ export class MAVLinkMessageDecoder {
       
       for (const result of decoderModules) {
         if (result.status === 'fulfilled' && result.value) {
-          const { dialectName, definitions } = result.value;
+          const { definitions } = result.value;
           for (const def of definitions) {
             if (!allDefinitions.has(def.id)) {
               allDefinitions.set(def.id, def);

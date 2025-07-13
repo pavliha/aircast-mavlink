@@ -66,16 +66,16 @@ jobs:
         node -e "
         console.log('Testing dialect imports...');
         const dialects = ['common', 'ardupilotmega', 'minimal', 'standard', 'test', 'paparazzi', 'python_array_test'];
-        dialects.forEach(async (dialect) => {
+        for (const dialect of dialects) {
           try {
             const dialectModule = require(\`./dist/dialects/\${dialect}/index.js\`);
             console.log(\`✅ \${dialect} dialect imported successfully\`);
             console.log(\`   Exports: \${Object.keys(dialectModule).length} items\`);
           } catch (error) {
-            console.error(\`❌ Failed to import \${dialect}:, error.message\`);
+            console.error(\`❌ Failed to import \${dialect}: \${error.message}\`);
             process.exit(1);
           }
-        });
+        }
         console.log('✅ All dialects imported successfully');
         "
 
