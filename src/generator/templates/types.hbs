@@ -1,0 +1,24 @@
+// Auto-generated TypeScript types for {{ dialectName }} dialect
+// Generated from MAVLink XML definitions
+
+export interface MAVLinkMessage<Content = unknown> {
+  timestamp: number;
+  system_id: number;
+  component_id: number;
+  type: string;
+  payload: Content;
+}
+
+{{#unless includeEnums}}
+{{#each enums}}
+{{#each description}}
+// {{ this }}
+{{/each}}
+export type {{ name }} =
+{{#each values}}
+  | {{ value }}{{#if description}} // {{ name }} - {{ join description " " }}{{/if}}
+{{/each}}
+  | number;
+
+{{/each}}
+{{/unless}}
