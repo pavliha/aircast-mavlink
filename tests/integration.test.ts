@@ -96,10 +96,10 @@ describe('MAVLink Integration Tests', () => {
 
         // Verify TypeScript files were generated
         const generatedFiles = [
-          join(testOutputDir, 'types.d.ts'),
-          join(testOutputDir, 'messages.d.ts'),
-          join(testOutputDir, 'enums.d.ts'),
-          join(testOutputDir, 'index.d.ts')
+          join(testOutputDir, 'types.ts'),
+          join(testOutputDir, 'messages.ts'),
+          join(testOutputDir, 'enums.ts'),
+          join(testOutputDir, 'index.ts')
         ];
 
         for (const file of generatedFiles) {
@@ -107,7 +107,7 @@ describe('MAVLink Integration Tests', () => {
         }
 
         // Verify decoder file was generated in the dialect directory
-        const decoderFile = join(testOutputDir, 'decoder.js');
+        const decoderFile = join(testOutputDir, 'decoder.ts');
         expect(await fs.access(decoderFile).then(() => true).catch(() => false)).toBe(true);
 
         // Read and verify decoder content
@@ -171,7 +171,7 @@ describe('MAVLink Integration Tests', () => {
           includeTypeGuards: false
         });
 
-        const decoderFile = join(testOutputDir, 'arrays', 'decoder.js');
+        const decoderFile = join(testOutputDir, 'arrays', 'decoder.ts');
         const decoderContent = await fs.readFile(decoderFile, 'utf-8');
         
         // Verify array fields are handled correctly

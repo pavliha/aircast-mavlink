@@ -43,7 +43,7 @@ describe('BatchProcessor', () => {
     beforeEach(() => {
       // Mock GitHub API response
       mockFetch.mockImplementation((url: string) => {
-        if (url.includes('github.com/repos/mavlink/mavlink/contents')) {
+        if (url && typeof url === 'string' && url.includes('github.com/repos/mavlink/mavlink/contents')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockDialectList)
