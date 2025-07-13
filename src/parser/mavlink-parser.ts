@@ -1,19 +1,19 @@
 // Main MAVLink parser that processes raw bytes and outputs JSON messages
 import { MAVLinkFrameParser } from './frame-parser';
-import { MAVLinkMessageDecoder } from './message-decoder';
+import { DialectParserFactory, MultiDialectParser } from './dialect-factory';
 import { CRCCalculator } from './crc';
 import { ParsedMAVLinkMessage, ParserError, ParserOptions } from './types';
 
 export class MAVLinkParser {
   private frameParser: MAVLinkFrameParser;
-  private messageDecoder: MAVLinkMessageDecoder;
+  private dialectParser: MultiDialectParser | null = null;
+  private dialectParserPromise: Promise<MultiDialectParser> | null = null;
   private buffer: Uint8Array;
   private bufferLength: number = 0;
   private options: ParserOptions;
 
   constructor(options: ParserOptions = {}) {
     this.frameParser = new MAVLinkFrameParser();
-    this.messageDecoder = new MAVLinkMessageDecoder();
     this.buffer = new Uint8Array(1024); // Initial buffer size
     this.options = {
       validateCRC: true,
@@ -25,14 +25,28 @@ export class MAVLinkParser {
   }
 
   /**
+   * Initialize the parser with dialect support
+   * Call this before parsing messages for best performance
+   */
+  public async initialize(): Promise<void> {
+    if (!this.dialectParser && !this.dialectParserPromise) {
+      this.dialectParserPromise = DialectParserFactory.createMultipleDialectParser(['common', 'ardupilotmega']);
+      this.dialectParser = await this.dialectParserPromise;
+    }
+  }
+
+  /**
    * Parse raw bytes from data channel and return JSON messages
    * @param data Raw bytes from data channel (WebRTC, WebSocket, etc.)
    * @returns Array of parsed MAVLink messages in JSON format
    */
-  public parseBytes(data: Uint8Array): ParsedMAVLinkMessage[] {
+  public async parseBytes(data: Uint8Array): Promise<ParsedMAVLinkMessage[]> {
     const messages: ParsedMAVLinkMessage[] = [];
-    
+
     try {
+      // Ensure dialect parser is ready
+      await this.ensureDialectParser();
+
       // Append new data to buffer
       this.appendToBuffer(data);
 
@@ -40,12 +54,12 @@ export class MAVLinkParser {
       let processedBytes = 0;
       while (processedBytes < this.bufferLength) {
         const parseResult = this.tryParseFrame(processedBytes);
-        
+
         if (parseResult === null) {
           // No complete frame found, wait for more data
           break;
         }
-        
+
         if (parseResult instanceof Error) {
           // Parse error, skip this byte and continue
           processedBytes++;
@@ -54,7 +68,7 @@ export class MAVLinkParser {
 
         const { frame, bytesConsumed } = parseResult;
         processedBytes += bytesConsumed;
-        
+
         // Validate CRC if enabled
         let crcValid = true;
         if (this.options.validateCRC) {
@@ -68,7 +82,7 @@ export class MAVLinkParser {
         // Decode message
         try {
           const frameWithCRC = { ...frame, crc_ok: crcValid };
-          const message = this.messageDecoder.decode(frameWithCRC);
+          const message = this.dialectParser!.decode(frameWithCRC);
           messages.push(message);
         } catch (error) {
           // Message decode error, continue with next frame
@@ -92,10 +106,13 @@ export class MAVLinkParser {
   /**
    * Parse a single raw message (for testing or when you have complete frames)
    */
-  public parseMessage(data: Uint8Array): ParsedMAVLinkMessage | null {
+  public async parseMessage(data: Uint8Array): Promise<ParsedMAVLinkMessage | null> {
     try {
+      // Ensure dialect parser is ready
+      await this.ensureDialectParser();
+
       const frame = this.frameParser.parseFrame(data);
-      
+
       let crcValid = true;
       if (this.options.validateCRC) {
         crcValid = this.validateFrameCRC(frame);
@@ -105,9 +122,18 @@ export class MAVLinkParser {
       }
 
       const frameWithCRC = { ...frame, crc_ok: crcValid };
-      return this.messageDecoder.decode(frameWithCRC);
+      return this.dialectParser!.decode(frameWithCRC);
     } catch (error) {
       throw new ParserError(`Failed to parse message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private async ensureDialectParser(): Promise<void> {
+    if (!this.dialectParser) {
+      if (!this.dialectParserPromise) {
+        this.dialectParserPromise = DialectParserFactory.createMultipleDialectParser(['common', 'ardupilotmega']);
+      }
+      this.dialectParser = await this.dialectParserPromise;
     }
   }
 
@@ -156,11 +182,11 @@ export class MAVLinkParser {
       // Try to parse frame from start position
       const frameData = this.buffer.subarray(startIndex, this.bufferLength);
       const frame = this.frameParser.parseFrame(frameData);
-      
+
       // Frame parsed successfully
       const frameLength = this.getFrameLength(frame);
       const bytesConsumed = startIndex - offset + frameLength;
-      
+
       return { frame, bytesConsumed };
     } catch (error) {
       // Not enough data or parse error
@@ -177,7 +203,7 @@ export class MAVLinkParser {
     const payloadSize = frame.payload.length;
     const checksumSize = 2;
     const signatureSize = frame.signature ? 13 : 0;
-    
+
     return headerSize + payloadSize + checksumSize + signatureSize;
   }
 
@@ -186,9 +212,9 @@ export class MAVLinkParser {
       // Reconstruct the data for CRC calculation
       const headerSize = frame.protocol_version === 2 ? 9 : 5; // Exclude magic byte
       const data = new Uint8Array(headerSize + frame.payload.length);
-      
+
       let offset = 0;
-      
+
       if (frame.protocol_version === 2) {
         data[offset++] = frame.payload.length;
         data[offset++] = frame.incompatible_flags || 0;
@@ -206,14 +232,14 @@ export class MAVLinkParser {
         data[offset++] = frame.component_id;
         data[offset++] = frame.message_id & 0xFF;
       }
-      
+
       // Add payload
       data.set(frame.payload, offset);
-      
+
       // Calculate CRC with extra byte
       const crcExtra = CRCCalculator.getCRCExtra(frame.message_id);
       const calculatedCRC = CRCCalculator.calculate(data, crcExtra);
-      
+
       return calculatedCRC === frame.checksum;
     } catch (error) {
       console.warn('CRC validation error:', error);

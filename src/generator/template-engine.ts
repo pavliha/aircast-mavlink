@@ -197,9 +197,39 @@ export function is{{ name }}(msg: MAVLinkMessage): msg is MAVLinkMessage<Message
 {{/each}}
 `));
 
-    // Decoder definitions template
-    this.templates.set('decoder', Handlebars.compile(`// Auto-generated decoder definitions for {{{ dialectName }}} dialect
+    // Combined decoder and parser template
+    this.templates.set('decoder', Handlebars.compile(`// Auto-generated decoder and parser for {{{ dialectName }}} dialect
 // Generated from MAVLink XML definitions
+
+// Parser types for MAVLink protocol parsing
+interface ParsedMAVLinkMessage {
+  timestamp: number;
+  system_id: number;
+  component_id: number;
+  message_id: number;
+  message_name: string;
+  sequence: number;
+  payload: Record<string, any>;
+  protocol_version: 1 | 2;
+  checksum: number;
+  crc_ok: boolean;
+  signature?: Uint8Array;
+  dialect?: string;
+}
+
+interface MAVLinkFrame {
+  magic: number;
+  length: number;
+  incompatible_flags?: number; // v2 only
+  compatible_flags?: number;   // v2 only
+  sequence: number;
+  system_id: number;
+  component_id: number;
+  message_id: number;
+  payload: Uint8Array;
+  checksum: number;
+  signature?: Uint8Array; // v2 only, 13 bytes
+}
 
 interface MessageDefinition {
   id: number;
@@ -214,7 +244,206 @@ interface FieldDefinition {
   extension?: boolean;
 }
 
-export const {{toUpperCase dialectName}}_MESSAGE_DEFINITIONS: MessageDefinition[] = [
+// Base dialect parser class
+abstract class DialectParser {
+  protected messageDefinitions: Map<number, MessageDefinition> = new Map();
+  protected dialectName: string;
+
+  constructor(dialectName: string) {
+    this.dialectName = dialectName;
+  }
+
+  abstract loadDefinitions(): Promise<void>;
+
+  decode(frame: MAVLinkFrame & { crc_ok?: boolean; protocol_version?: 1 | 2 }): ParsedMAVLinkMessage {
+    const messageDef = this.messageDefinitions.get(frame.message_id);
+    
+    const protocolVersion = frame.protocol_version || (frame.magic === 0xFD ? 2 : 1);
+    
+    if (!messageDef) {
+      return {
+        timestamp: Date.now(),
+        system_id: frame.system_id,
+        component_id: frame.component_id,
+        message_id: frame.message_id,
+        message_name: \`UNKNOWN_\${frame.message_id}\`,
+        sequence: frame.sequence,
+        payload: {
+          raw_payload: Array.from(frame.payload)
+        },
+        protocol_version: protocolVersion,
+        checksum: frame.checksum,
+        crc_ok: frame.crc_ok !== false,
+        signature: frame.signature,
+        dialect: this.dialectName
+      };
+    }
+
+    const payload = this.decodePayload(frame.payload, messageDef.fields);
+    
+    return {
+      timestamp: Date.now(),
+      system_id: frame.system_id,
+      component_id: frame.component_id,
+      message_id: frame.message_id,
+      message_name: messageDef.name,
+      sequence: frame.sequence,
+      payload,
+      protocol_version: protocolVersion,
+      checksum: frame.checksum,
+      crc_ok: frame.crc_ok !== false,
+      signature: frame.signature,
+      dialect: this.dialectName
+    };
+  }
+
+  private decodePayload(payload: Uint8Array, fields: FieldDefinition[]): any {
+    const result: any = {};
+    const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    let offset = 0;
+
+    for (const field of fields) {
+      if (offset >= payload.length) {
+        result[field.name] = this.getDefaultValue(field);
+      } else {
+        const { value, bytesRead } = this.decodeField(view, offset, field);
+        result[field.name] = value;
+        offset += bytesRead;
+      }
+    }
+
+    return result;
+  }
+
+  private getDefaultValue(field: FieldDefinition): any {
+    const isArray = field.arrayLength !== undefined && field.arrayLength > 1;
+    
+    if (isArray) {
+      return [];
+    }
+
+    switch (field.type) {
+      case 'uint8_t':
+      case 'int8_t':
+      case 'uint16_t':
+      case 'int16_t':
+      case 'uint32_t':
+      case 'int32_t':
+      case 'float':
+      case 'double':
+        return 0;
+      case 'uint64_t':
+      case 'int64_t':
+        return 0n;
+      case 'char':
+        return '\\0';
+      default:
+        if (field.type.startsWith('char[') || field.type.includes('[]')) {
+          return '';
+        }
+        return 0;
+    }
+  }
+
+  private decodeField(view: DataView, offset: number, field: FieldDefinition): { value: any; bytesRead: number } {
+    const isArray = field.arrayLength !== undefined;
+    const arrayLength = field.arrayLength || 1;
+    
+    if (isArray && arrayLength > 1) {
+      const values: any[] = [];
+      let totalBytes = 0;
+      
+      for (let i = 0; i < arrayLength; i++) {
+        if (offset + totalBytes >= view.byteLength) break;
+        const { value, bytesRead } = this.decodeSingleValue(view, offset + totalBytes, field.type);
+        values.push(value);
+        totalBytes += bytesRead;
+      }
+      
+      return { value: values, bytesRead: totalBytes };
+    } else {
+      return this.decodeSingleValue(view, offset, field.type);
+    }
+  }
+
+  private decodeSingleValue(view: DataView, offset: number, type: string): { value: any; bytesRead: number } {
+    try {
+      switch (type) {
+        case 'uint8_t':
+          return { value: view.getUint8(offset), bytesRead: 1 };
+        case 'int8_t':
+          return { value: view.getInt8(offset), bytesRead: 1 };
+        case 'uint16_t':
+          return { value: view.getUint16(offset, true), bytesRead: 2 };
+        case 'int16_t':
+          return { value: view.getInt16(offset, true), bytesRead: 2 };
+        case 'uint32_t':
+          return { value: view.getUint32(offset, true), bytesRead: 4 };
+        case 'int32_t':
+          return { value: view.getInt32(offset, true), bytesRead: 4 };
+        case 'uint64_t':
+          return { value: view.getBigUint64(offset, true), bytesRead: 8 };
+        case 'int64_t':
+          return { value: view.getBigInt64(offset, true), bytesRead: 8 };
+        case 'float':
+          return { value: view.getFloat32(offset, true), bytesRead: 4 };
+        case 'double':
+          return { value: view.getFloat64(offset, true), bytesRead: 8 };
+        case 'char': {
+          const charCode = view.getUint8(offset);
+          return { value: charCode === 0 ? '\\0' : String.fromCharCode(charCode), bytesRead: 1 };
+        }
+        default:
+          if (type.startsWith('char[') && type.endsWith(']')) {
+            const length = parseInt(type.slice(5, -1));
+            const chars: string[] = [];
+            for (let i = 0; i < length && offset + i < view.byteLength; i++) {
+              const charCode = view.getUint8(offset + i);
+              if (charCode === 0) break;
+              chars.push(String.fromCharCode(charCode));
+            }
+            return { value: chars.join(''), bytesRead: length };
+          } else if (type.includes('[') && type.includes(']')) {
+            const baseType = type.substring(0, type.indexOf('['));
+            const arrayLength = parseInt(type.substring(type.indexOf('[') + 1, type.indexOf(']')));
+            const values: any[] = [];
+            let totalBytes = 0;
+            
+            for (let i = 0; i < arrayLength; i++) {
+              if (offset + totalBytes >= view.byteLength) break;
+              const { value, bytesRead } = this.decodeSingleValue(view, offset + totalBytes, baseType);
+              values.push(value);
+              totalBytes += bytesRead;
+            }
+            
+            return { value: values, bytesRead: totalBytes };
+          }
+          return { value: view.getUint8(offset), bytesRead: 1 };
+      }
+    } catch (error) {
+      return { value: 0, bytesRead: 1 };
+    }
+  }
+
+  getMessageDefinition(id: number): MessageDefinition | undefined {
+    return this.messageDefinitions.get(id);
+  }
+
+  getSupportedMessageIds(): number[] {
+    return Array.from(this.messageDefinitions.keys()).sort((a, b) => a - b);
+  }
+
+  getDialectName(): string {
+    return this.dialectName;
+  }
+
+  supportsMessage(messageId: number): boolean {
+    return this.messageDefinitions.has(messageId);
+  }
+}
+
+{{#if messages}}
+const MESSAGE_DEFINITIONS: MessageDefinition[] = [
 {{#each messages}}
   {
     id: {{ id }},
@@ -236,7 +465,32 @@ export const {{toUpperCase dialectName}}_MESSAGE_DEFINITIONS: MessageDefinition[
   },
 {{/each}}
 ];
+{{else}}
+const MESSAGE_DEFINITIONS: MessageDefinition[] = [];
+{{/if}}
+
+export class {{capitalize dialectName}}Parser extends DialectParser {
+  constructor() {
+    super('{{{ dialectName }}}');
+    this.loadDefinitionsSync();
+  }
+
+  async loadDefinitions(): Promise<void> {
+    this.messageDefinitions.clear();
+    for (const def of MESSAGE_DEFINITIONS) {
+      this.messageDefinitions.set(def.id, def);
+    }
+  }
+
+  private loadDefinitionsSync(): void {
+    this.messageDefinitions.clear();
+    for (const def of MESSAGE_DEFINITIONS) {
+      this.messageDefinitions.set(def.id, def);
+    }
+  }
+}
 `));
+
   }
 
   private registerHelpers(): void {
@@ -254,6 +508,10 @@ export const {{toUpperCase dialectName}}_MESSAGE_DEFINITIONS: MessageDefinition[
 
     Handlebars.registerHelper('toUpperCase', (str: string) => {
       return str.toUpperCase();
+    });
+
+    Handlebars.registerHelper('capitalize', (str: string) => {
+      return str.charAt(0).toUpperCase() + str.slice(1);
     });
   }
 
@@ -304,5 +562,6 @@ export const {{toUpperCase dialectName}}_MESSAGE_DEFINITIONS: MessageDefinition[
     }
     return template(dialect);
   }
+
 
 }

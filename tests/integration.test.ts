@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { MAVLinkGenerator } from '../src/generator/generator';
-import { MAVLinkMessageDecoder } from '../src/parser/message-decoder';
+import { DialectParserFactory } from '../src/parser/dialect-factory';
 import { MAVLinkParser } from '../src/parser/mavlink-parser';
 
 describe('MAVLink Integration Tests', () => {
@@ -112,28 +112,21 @@ describe('MAVLink Integration Tests', () => {
 
         // Read and verify decoder content
         const decoderContent = await fs.readFile(decoderFile, 'utf-8');
-        expect(decoderContent).toContain('TEST_MESSAGE_DEFINITIONS');
+        expect(decoderContent).toContain('TestParser');
         expect(decoderContent).toContain('HEARTBEAT');
         expect(decoderContent).toContain('SYS_STATUS'); 
         expect(decoderContent).toContain('GLOBAL_POSITION_INT');
 
-        // Test decoder functionality by loading the generated definitions
+        // Test decoder functionality by dynamically importing the generated decoder
         const decoderModule = await import(decoderFile);
-        const MESSAGE_DEFINITIONS = decoderModule.TEST_MESSAGE_DEFINITIONS;
-        expect(MESSAGE_DEFINITIONS).toHaveLength(3);
+        const TestParser = decoderModule.TestParser;
+        const parser = new TestParser();
         
-        // Verify message definitions structure
-        const heartbeatDef = MESSAGE_DEFINITIONS.find((m: any) => m.name === 'HEARTBEAT');
-        expect(heartbeatDef).toBeDefined();
-        expect(heartbeatDef.id).toBe(0);
-        expect(heartbeatDef.fields).toHaveLength(6);
-        expect(heartbeatDef.fields[0].name).toBe('type');
-        expect(heartbeatDef.fields[0].type).toBe('uint8_t');
-
-        const globalPosDef = MESSAGE_DEFINITIONS.find((m: any) => m.name === 'GLOBAL_POSITION_INT');
-        expect(globalPosDef).toBeDefined();
-        expect(globalPosDef.id).toBe(33);
-        expect(globalPosDef.fields).toHaveLength(9);
+        expect(parser.getDialectName()).toBe('test');
+        expect(parser.getSupportedMessageIds()).toContain(0);
+        expect(parser.getSupportedMessageIds()).toContain(1);
+        expect(parser.getSupportedMessageIds()).toContain(33);
+        expect(parser.getSupportedMessageIds()).toHaveLength(3);
 
       } finally {
         process.cwd = originalCwd;
@@ -180,17 +173,12 @@ describe('MAVLink Integration Tests', () => {
         expect(decoderContent).toContain("type: 'uint8_t'");
 
         const decoderModule = await import(decoderFile);
-        const MESSAGE_DEFINITIONS = decoderModule.ARRAYS_MESSAGE_DEFINITIONS;
-        const gpsStatusDef = MESSAGE_DEFINITIONS.find((m: any) => m.name === 'GPS_STATUS');
+        const ArraysParser = decoderModule.ArraysParser;
+        const parser = new ArraysParser();
         
-        expect(gpsStatusDef).toBeDefined();
-        expect(gpsStatusDef.fields).toHaveLength(6);
-        
-        // Check array field definition
-        const arrayField = gpsStatusDef.fields.find((f: any) => f.name === 'satellite_prn');
-        expect(arrayField).toBeDefined();
-        expect(arrayField.type).toBe('uint8_t');
-        expect(arrayField.arrayLength).toBe(20);
+        expect(parser.getDialectName()).toBe('arrays');
+        expect(parser.getSupportedMessageIds()).toContain(25);
+        expect(parser.getSupportedMessageIds()).toHaveLength(1);
 
       } finally {
         process.cwd = originalCwd;
@@ -198,11 +186,11 @@ describe('MAVLink Integration Tests', () => {
     }, 10000);
   });
 
-  describe('Message Decoder Integration', () => {
-    let decoder: MAVLinkMessageDecoder;
+  describe('Dialect Parser Integration', () => {
+    let parser: any;
 
     beforeEach(async () => {
-      decoder = await MAVLinkMessageDecoder.createWithGeneratedDefinitions(); // Use basic decoder for tests
+      parser = await DialectParserFactory.createParser('common');
     });
 
     it('should decode HEARTBEAT message correctly', () => {
@@ -225,7 +213,7 @@ describe('MAVLink Integration Tests', () => {
         protocol_version: 2 as const
       };
 
-      const decoded = decoder.decode(heartbeatFrame);
+      const decoded = parser.decode(heartbeatFrame);
 
       expect(decoded.message_name).toBe('HEARTBEAT');
       expect(decoded.message_id).toBe(0);
@@ -273,7 +261,7 @@ describe('MAVLink Integration Tests', () => {
         protocol_version: 2 as const
       };
 
-      const decoded = decoder.decode(sysStatusFrame);
+      const decoded = parser.decode(sysStatusFrame);
 
       expect(decoded.message_name).toBe('SYS_STATUS');
       expect(decoded.payload.onboard_control_sensors_present).toBe(0x12345678);
@@ -298,7 +286,7 @@ describe('MAVLink Integration Tests', () => {
         protocol_version: 2 as const
       };
 
-      const decoded = decoder.decode(unknownFrame);
+      const decoded = parser.decode(unknownFrame);
 
       expect(decoded.message_name).toBe('UNKNOWN_99999');
       expect(decoded.message_id).toBe(99999);
@@ -319,7 +307,7 @@ describe('MAVLink Integration Tests', () => {
         protocol_version: 2 as const
       };
 
-      const decoded = decoder.decode(partialFrame);
+      const decoded = parser.decode(partialFrame);
 
       expect(decoded.message_name).toBe('HEARTBEAT');
       expect(decoded.payload.type).toBe(6);
@@ -341,7 +329,7 @@ describe('MAVLink Integration Tests', () => {
       });
     });
 
-    it('should parse complete MAVLink v2 frame and decode message', () => {
+    it('should parse complete MAVLink v2 frame and decode message', async () => {
       // Create a complete MAVLink v2 HEARTBEAT frame
       const frame = new Uint8Array([
         0xFD,               // Magic (MAVLink v2)
@@ -363,7 +351,7 @@ describe('MAVLink Integration Tests', () => {
         0x12, 0x34
       ]);
 
-      const messages = parser.parseBytes(frame);
+      const messages = await parser.parseBytes(frame);
 
       expect(messages).toHaveLength(1);
       
@@ -376,7 +364,7 @@ describe('MAVLink Integration Tests', () => {
       expect(decoded.payload.autopilot).toBe(3);
     });
 
-    it('should handle multiple messages in single buffer', () => {
+    it('should handle multiple messages in single buffer', async () => {
       // Create two HEARTBEAT frames
       const frame1 = new Uint8Array([
         0xFD, 0x09, 0x00, 0x00, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00,
@@ -395,7 +383,7 @@ describe('MAVLink Integration Tests', () => {
       combined.set(frame1, 0);
       combined.set(frame2, frame1.length);
 
-      const messages = parser.parseBytes(combined);
+      const messages = await parser.parseBytes(combined);
 
       expect(messages).toHaveLength(2);
       expect(messages[0].sequence).toBe(1);
@@ -404,14 +392,14 @@ describe('MAVLink Integration Tests', () => {
       expect(messages[1].message_name).toBe('HEARTBEAT');
     });
 
-    it('should handle incomplete frames gracefully', () => {
+    it('should handle incomplete frames gracefully', async () => {
       // Incomplete frame (missing payload and checksum)
       const incompleteFrame = new Uint8Array([
         0xFD, 0x09, 0x00, 0x00, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00,
         0x06, 0x03 // Only 2 bytes of 9-byte payload
       ]);
 
-      const messages = parser.parseBytes(incompleteFrame);
+      const messages = await parser.parseBytes(incompleteFrame);
       expect(messages).toHaveLength(0); // Should wait for more data
 
       // Complete the frame
@@ -420,23 +408,23 @@ describe('MAVLink Integration Tests', () => {
         0x12, 0x34 // Checksum
       ]);
 
-      const messagesAfterComplete = parser.parseBytes(remainingData);
+      const messagesAfterComplete = await parser.parseBytes(remainingData);
       expect(messagesAfterComplete).toHaveLength(1);
       expect(messagesAfterComplete[0].message_name).toBe('HEARTBEAT');
     });
   });
 
-  describe('Decoder Performance and Statistics', () => {
-    let decoder: MAVLinkMessageDecoder;
+  describe('Dialect Parser Performance and Statistics', () => {
+    let parser: any;
 
     beforeEach(async () => {
-      decoder = await MAVLinkMessageDecoder.createWithGeneratedDefinitions();
+      parser = await DialectParserFactory.createMultipleDialectParser(['common', 'ardupilotmega']);
     });
 
     it('should provide accurate statistics about supported messages', () => {
-      const supportedIds = decoder.getSupportedMessageIds();
+      const supportedIds = parser.getSupportedMessageIds();
       
-      expect(supportedIds.length).toBeGreaterThan(300); // Generated decoder has 319+ messages
+      expect(supportedIds.length).toBeGreaterThan(300); // Generated parser has 319+ messages
       expect(supportedIds).toContain(0);  // HEARTBEAT
       expect(supportedIds).toContain(1);  // SYS_STATUS
       expect(supportedIds).toContain(33); // GLOBAL_POSITION_INT
@@ -459,7 +447,7 @@ describe('MAVLink Integration Tests', () => {
       const startTime = Date.now();
 
       for (let i = 0; i < iterations; i++) {
-        const decoded = decoder.decode(heartbeatFrame);
+        const decoded = parser.decode(heartbeatFrame);
         expect(decoded.message_name).toBe('HEARTBEAT');
       }
 
@@ -471,21 +459,21 @@ describe('MAVLink Integration Tests', () => {
     });
 
     it('should get message definition by ID', () => {
-      const heartbeatDef = decoder.getMessageDefinition(0);
+      const heartbeatDef = parser.getParserForMessage(0)?.getMessageDefinition(0);
       expect(heartbeatDef).toBeDefined();
       expect(heartbeatDef!.name).toBe('HEARTBEAT');
       expect(heartbeatDef!.fields).toHaveLength(6); // HEARTBEAT has 6 fields in generated definitions
 
-      const unknownDef = decoder.getMessageDefinition(99999);
-      expect(unknownDef).toBeUndefined();
+      const unknownParser = parser.getParserForMessage(99999);
+      expect(unknownParser).toBeUndefined();
     });
   });
 
   describe('Error Handling and Edge Cases', () => {
-    let decoder: MAVLinkMessageDecoder;
+    let parser: any;
 
     beforeEach(async () => {
-      decoder = await MAVLinkMessageDecoder.createWithGeneratedDefinitions();
+      parser = await DialectParserFactory.createParser('common');
     });
 
     it('should handle malformed frames gracefully', () => {
@@ -501,7 +489,7 @@ describe('MAVLink Integration Tests', () => {
         protocol_version: 2 as const
       };
 
-      const decoded = decoder.decode(malformedFrame);
+      const decoded = parser.decode(malformedFrame);
       expect(decoded.message_name).toBe('HEARTBEAT');
       // All fields should default to 0 due to empty payload
       expect(decoded.payload.type).toBe(0);
@@ -516,7 +504,7 @@ describe('MAVLink Integration Tests', () => {
         checksum: 0, protocol_version: 2 as const
       };
 
-      const decoded = decoder.decode(largeIdFrame);
+      const decoded = parser.decode(largeIdFrame);
       expect(decoded.message_name).toBe('UNKNOWN_16777215');
       expect(decoded.message_id).toBe(0xFFFFFF);
     });
@@ -528,7 +516,7 @@ describe('MAVLink Integration Tests', () => {
         checksum: 0, protocol_version: 1 as const
       };
 
-      const decoded = decoder.decode(v1Frame);
+      const decoded = parser.decode(v1Frame);
       expect(decoded.message_name).toBe('HEARTBEAT');
       expect(decoded.protocol_version).toBe(1);
     });

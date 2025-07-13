@@ -35,7 +35,7 @@ export class TypeConverter {
     // Convert enums with deduplication
     if (definition.enums) {
       const enumMap = new Map<string, TypeScriptEnum>();
-      
+
       for (const enumDef of definition.enums) {
         const tsEnum = this.convertEnum(enumDef);
         if (tsEnum) {
@@ -55,7 +55,7 @@ export class TypeConverter {
           }
         }
       }
-      
+
       tsDialect.enums = Array.from(enumMap.values());
     }
 
@@ -104,6 +104,7 @@ export class TypeConverter {
     }
 
     const tsMessage: TypeScriptMessage = {
+      id: messageDef.id,
       name: this.convertMessageName(messageDef.name),
       originalName: messageDef.name,
       description: this.parseDescription(messageDef.description || ''),
@@ -125,11 +126,24 @@ export class TypeConverter {
       return null;
     }
 
+    let arrayLength: number | undefined;
+    let originalType = fieldDef.type;
+    
+    // Handle array types like uint8_t[4]
+    const arrayMatch = fieldDef.type.match(/^([^[]+)\[(\d+)\]$/);
+    if (arrayMatch) {
+      originalType = arrayMatch[1];
+      arrayLength = parseInt(arrayMatch[2]);
+    }
+
     const tsField: TypeScriptField = {
       name: this.convertFieldName(fieldDef.name),
       type: this.convertFieldType(fieldDef.type, fieldDef.enum, enums),
+      originalType: fieldDef.type,
       description: this.parseDescription(fieldDef.description || ''),
-      optional: fieldDef.extension || false
+      optional: fieldDef.extension || false,
+      arrayLength,
+      extension: fieldDef.extension
     };
 
     return tsField;

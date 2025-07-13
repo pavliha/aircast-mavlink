@@ -12,6 +12,7 @@ export interface ParsedMAVLinkMessage {
   checksum: number;
   crc_ok: boolean;
   signature?: Uint8Array;
+  dialect?: string;
 }
 
 export interface MAVLinkFrame {

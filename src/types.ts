@@ -50,11 +50,15 @@ export interface TypeScriptEnumValue {
 export interface TypeScriptField {
   name: string;
   type: string;
+  originalType?: string;
   description: string[];
   optional: boolean;
+  arrayLength?: number;
+  extension?: boolean;
 }
 
 export interface TypeScriptMessage {
+  id?: number;
   name: string;
   originalName: string;
   description: string[];

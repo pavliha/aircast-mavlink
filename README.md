@@ -186,7 +186,7 @@ await generator.generateFromFile('./dialect.xml', './output', {
 import { 
   MAVLinkParser, 
   MAVLinkFrameParser, 
-  MAVLinkMessageDecoder,
+  DialectParserFactory,
   CRCCalculator
 } from 'aircast-mavlink';
 
@@ -196,35 +196,34 @@ import * as MinimalTypes from 'aircast-mavlink/types/minimal';
 import * as ArduPilotMegaTypes from 'aircast-mavlink/types/ardupilotmega';
 import * as StandardTypes from 'aircast-mavlink/types/standard';
 
-// Basic message parsing
+// Basic message parsing with async initialization
 const parser = new MAVLinkParser({ validateCRC: true });
+await parser.initialize(); // Initialize dialect parsers
 
 // Parse incoming data (Buffer or Uint8Array)
-const messages = parser.parseBytes(incomingData);
+const messages = await parser.parseBytes(incomingData);
 messages.forEach(message => {
   console.log(`Message: ${message.message_name}`);
   console.log(`From: ${message.system_id}:${message.component_id}`);
   console.log(`Payload:`, message.payload);
 });
 
-// Advanced frame-by-frame parsing
-const frameParser = new MAVLinkFrameParser();
-const decoder = new MAVLinkMessageDecoder();
+// Advanced dialect-specific parsing
+const dialectParser = await DialectParserFactory.createParser('common');
 
-frameParser.on('frame', (frame) => {
-  const message = decoder.decode(frame);
-  if (message) {
-    console.log('Decoded message:', message);
-  }
-});
+const frame = {
+  magic: 0xFD, length: 9, sequence: 1, system_id: 1, component_id: 1,
+  message_id: 0, payload: new Uint8Array([6, 3, 196, 144, 0, 0, 4, 0, 0]),
+  checksum: 0x1234, protocol_version: 2
+};
 
-// Process streaming data
-frameParser.process(dataBuffer);
+const message = dialectParser.decode(frame);
+console.log('Decoded message:', message);
 
 // WebSocket integration example
-websocket.onmessage = (event) => {
+websocket.onmessage = async (event) => {
   const data = new Uint8Array(event.data);
-  const messages = parser.parseBytes(data);
+  const messages = await parser.parseBytes(data);
   
   messages.forEach(msg => {
     switch (msg.message_name) {
@@ -337,8 +336,14 @@ interface ParserOptions {
 class MAVLinkParser {
   constructor(options?: ParserOptions);
   
+  // Initialize dialect parsers (call before parsing)
+  initialize(): Promise<void>;
+  
   // Parse bytes and return complete messages
-  parseBytes(data: Buffer | Uint8Array): MAVLinkMessage[];
+  parseBytes(data: Buffer | Uint8Array): Promise<MAVLinkMessage[]>;
+  
+  // Parse single message
+  parseMessage(data: Uint8Array): Promise<MAVLinkMessage | null>;
   
   // Reset parser state
   reset(): void;
@@ -365,14 +370,20 @@ class MAVLinkFrameParser extends EventEmitter {
 }
 ```
 
-### MAVLinkMessageDecoder
+### DialectParserFactory
 
-Decodes frames into structured messages.
+Creates and manages dialect-specific parsers.
 
 ```typescript
-class MAVLinkMessageDecoder {
-  // Decode a frame into a message
-  decode(frame: MAVLinkFrame): MAVLinkMessage | null;
+class DialectParserFactory {
+  // Create single dialect parser
+  static createParser(dialectName: SupportedDialects): Promise<DialectParser>;
+  
+  // Create multi-dialect parser
+  static createMultipleDialectParser(dialectNames: SupportedDialects[]): Promise<MultiDialectParser>;
+  
+  // Get list of supported dialects
+  static getSupportedDialects(): SupportedDialects[];
 }
 ```
 
@@ -432,20 +443,20 @@ python3 -m http.server 8000
 const parser = new MAVLinkParser({ validateCRC: true });
 
 // WebRTC data channel
-dataChannel.onmessage = (event) => {
-  const messages = parser.parseBytes(new Uint8Array(event.data));
+dataChannel.onmessage = async (event) => {
+  const messages = await parser.parseBytes(new Uint8Array(event.data));
   messages.forEach(processMessage);
 };
 
 // WebSocket connection
-websocket.onmessage = (event) => {
-  const messages = parser.parseBytes(new Uint8Array(event.data));
+websocket.onmessage = async (event) => {
+  const messages = await parser.parseBytes(new Uint8Array(event.data));
   messages.forEach(processMessage);
 };
 
 // TCP/UDP streams (Node.js)
-socket.on('data', (data) => {
-  const messages = parser.parseBytes(data);
+socket.on('data', async (data) => {
+  const messages = await parser.parseBytes(data);
   messages.forEach(processMessage);
 });
 ```
@@ -476,7 +487,7 @@ function processMessage(msg: MAVLinkMessage) {
 #### Error Handling and Recovery
 ```typescript
 try {
-  const messages = parser.parseBytes(incomingData);
+  const messages = await parser.parseBytes(incomingData);
   messages.forEach(processMessage);
 } catch (error) {
   console.error('Parse error:', error.message);
