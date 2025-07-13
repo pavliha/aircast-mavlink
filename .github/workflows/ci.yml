@@ -27,21 +27,14 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
+    - name: Build project
+      run: npm run build
+      
     - name: Run linter
       run: npm run lint
       
     - name: Run tests
       run: npm test
-      
-    - name: Build project
-      run: npm run build
-      
-    - name: Generate and compile types
-      run: |
-        npm run gen:common
-        npm run gen:minimal
-        npx tsc types/common/*.ts --outDir types/common --target ES2020 --module commonjs --skipLibCheck
-        npx tsc types/minimal/*.ts --outDir types/minimal --target ES2020 --module commonjs --skipLibCheck
       
     - name: Test CLI functionality
       run: |
@@ -61,9 +54,9 @@ jobs:
     - name: Verify generated types
       run: |
         node -e "
-        const commonTypes = require('./types/common/index.js');
+        const commonTypes = require('./dist/types/common/index.js');
         console.log('✅ CommonTypes available');
-        const minimalTypes = require('./types/minimal/index.js');
+        const minimalTypes = require('./dist/types/minimal/index.js');
         console.log('✅ MinimalTypes available');
         console.log('✅ All generated types accessible');
         "
@@ -99,5 +92,4 @@ jobs:
         name: build-artifacts
         path: |
           dist/
-          types/
         retention-days: 7
