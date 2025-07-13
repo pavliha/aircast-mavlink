@@ -19,7 +19,7 @@ export interface MAVLinkMessage<Content = unknown> {
   system_id: number;
   component_id: number;
   type: string;
-  content: Content;
+  payload: Content;
 }
 
 {{#each enums}}
@@ -118,7 +118,7 @@ export interface MAVLinkMessage<Content = unknown> {
   system_id: number;
   component_id: number;
   type: string;
-  content: Content;
+  payload: Content;
 }
 
 // Enums
