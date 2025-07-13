@@ -39,27 +39,26 @@ export class MAVLinkGenerator {
       const content = this.templateEngine.generateSingle(tsDialect);
       await fs.writeFile(join(outputPath, 'index.ts'), content);
     } else {
-      // Generate separate files
+      // Generate separate files as .d.ts files
       const typesContent = this.templateEngine.generateTypes(tsDialect);
-      await fs.writeFile(join(outputPath, 'types.ts'), typesContent);
+      await fs.writeFile(join(outputPath, 'types.d.ts'), typesContent);
 
       if (options.includeEnums) {
         const enumsContent = this.templateEngine.generateEnums(tsDialect);
-        await fs.writeFile(join(outputPath, 'enums.ts'), enumsContent);
+        await fs.writeFile(join(outputPath, 'enums.d.ts'), enumsContent);
       }
 
       const messagesContent = this.templateEngine.generateMessages(tsDialect);
-      await fs.writeFile(join(outputPath, 'messages.ts'), messagesContent);
+      await fs.writeFile(join(outputPath, 'messages.d.ts'), messagesContent);
 
       const indexContent = this.templateEngine.generateIndex(tsDialect, options.includeEnums);
-      await fs.writeFile(join(outputPath, 'index.ts'), indexContent);
+      await fs.writeFile(join(outputPath, 'index.d.ts'), indexContent);
     }
 
-    // Always generate decoder definitions in dist folder (for both single and separate modes)
+    // Generate decoder definitions in the same dialect directory
     const decoderContent = this.generateDecoderDefinitions(definition, options.dialectName);
-    const distDecoderPath = join(process.cwd(), 'dist', 'decoders', `${options.dialectName}.ts`);
-    await fs.mkdir(join(process.cwd(), 'dist', 'decoders'), { recursive: true });
-    await fs.writeFile(distDecoderPath, decoderContent);
+    const decoderPath = join(outputPath, 'decoder.js');
+    await fs.writeFile(decoderPath, decoderContent);
 
     console.log(`Generated TypeScript types for ${options.dialectName} in ${outputPath}`);
   }
@@ -68,20 +67,10 @@ export class MAVLinkGenerator {
     let code = `// Auto-generated decoder definitions for ${dialectName} dialect\n`;
     code += `// Generated from MAVLink XML definitions\n\n`;
     
-    code += `export interface MessageDefinition {\n`;
-    code += `  id: number;\n`;
-    code += `  name: string;\n`;
-    code += `  fields: FieldDefinition[];\n`;
-    code += `}\n\n`;
+    const dialectNameUpper = dialectName.toUpperCase();
+    const exportName = `${dialectNameUpper}_MESSAGE_DEFINITIONS`;
     
-    code += `export interface FieldDefinition {\n`;
-    code += `  name: string;\n`;
-    code += `  type: string;\n`;
-    code += `  arrayLength?: number;\n`;
-    code += `  extension?: boolean;\n`;
-    code += `}\n\n`;
-    
-    code += `export const MESSAGE_DEFINITIONS: MessageDefinition[] = [\n`;
+    code += `const ${exportName} = [\n`;
     
     for (const message of definition.messages || []) {
       code += `  {\n`;
@@ -116,7 +105,10 @@ export class MAVLinkGenerator {
       code += `  },\n`;
     }
     
-    code += `];\n`;
+    code += `];\n\n`;
+    code += `module.exports = {\n`;
+    code += `  ${exportName}\n`;
+    code += `};\n`;
     
     return code;
   }

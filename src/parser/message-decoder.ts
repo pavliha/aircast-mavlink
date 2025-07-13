@@ -211,7 +211,7 @@ export class MAVLinkMessageDecoder {
       
       for (const dialectName of dialects) {
         try {
-          const decoderModule = await import(`../../dist/parser/decoders/${dialectName}-decoder`);
+          const decoderModule = await import(`../../dist/dialects/${dialectName}/decoder`);
           const exportName = `${dialectName.toUpperCase()}_MESSAGE_DEFINITIONS`;
           const MESSAGE_DEFINITIONS = decoderModule[exportName];
           if (MESSAGE_DEFINITIONS) {

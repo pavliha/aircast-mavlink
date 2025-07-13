@@ -33,10 +33,10 @@ jobs:
     - name: Verify decoder files exist
       run: |
         echo "Checking for decoder files..."
-        ls -la dist/parser/decoders/
-        test -f dist/parser/decoders/common-decoder.js || (echo "common-decoder.js not found" && exit 1)
-        test -f dist/parser/decoders/ardupilotmega-decoder.js || (echo "ardupilotmega-decoder.js not found" && exit 1)
-        test -f dist/parser/decoders/minimal-decoder.js || (echo "minimal-decoder.js not found" && exit 1)
+        ls -la dist/dialects/
+        test -f dist/dialects/common/decoder.js || (echo "common/decoder.js not found" && exit 1)
+        test -f dist/dialects/ardupilotmega/decoder.js || (echo "ardupilotmega/decoder.js not found" && exit 1)
+        test -f dist/dialects/minimal/decoder.js || (echo "minimal/decoder.js not found" && exit 1)
         echo "All decoder files found!"
 
     - name: Run linter
@@ -63,11 +63,18 @@ jobs:
     - name: Verify generated types
       run: |
         node -e "
-        const commonTypes = require('./dist/types/common/index.js');
-        console.log('✅ CommonTypes available');
-        const minimalTypes = require('./dist/types/minimal/index.js');
-        console.log('✅ MinimalTypes available');
-        console.log('✅ All generated types accessible');
+        console.log('Checking dialect structure...');
+        const fs = require('fs');
+        ['common', 'ardupilotmega', 'minimal'].forEach(dialect => {
+          const dir = \`./dist/dialects/\${dialect}\`;
+          if (!fs.existsSync(\`\${dir}/index.d.ts\`)) throw new Error(\`Missing \${dialect}/index.d.ts\`);
+          if (!fs.existsSync(\`\${dir}/types.d.ts\`)) throw new Error(\`Missing \${dialect}/types.d.ts\`);
+          if (!fs.existsSync(\`\${dir}/messages.d.ts\`)) throw new Error(\`Missing \${dialect}/messages.d.ts\`);
+          if (!fs.existsSync(\`\${dir}/enums.d.ts\`)) throw new Error(\`Missing \${dialect}/enums.d.ts\`);
+          if (!fs.existsSync(\`\${dir}/decoder.js\`)) throw new Error(\`Missing \${dialect}/decoder.js\`);
+          console.log(\`✅ \${dialect} dialect structure complete\`);
+        });
+        console.log('✅ All dialect structures verified');
         "
 
   build-check:

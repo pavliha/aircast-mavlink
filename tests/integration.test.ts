@@ -96,29 +96,30 @@ describe('MAVLink Integration Tests', () => {
 
         // Verify TypeScript files were generated
         const generatedFiles = [
-          join(testOutputDir, 'types.ts'),
-          join(testOutputDir, 'messages.ts'),
-          join(testOutputDir, 'enums.ts'),
-          join(testOutputDir, 'index.ts')
+          join(testOutputDir, 'types.d.ts'),
+          join(testOutputDir, 'messages.d.ts'),
+          join(testOutputDir, 'enums.d.ts'),
+          join(testOutputDir, 'index.d.ts')
         ];
 
         for (const file of generatedFiles) {
           expect(await fs.access(file).then(() => true).catch(() => false)).toBe(true);
         }
 
-        // Verify decoder file was generated in dist
-        const decoderFile = join(testDistDir, 'dist', 'decoders', 'test.ts');
+        // Verify decoder file was generated in the dialect directory
+        const decoderFile = join(testOutputDir, 'decoder.js');
         expect(await fs.access(decoderFile).then(() => true).catch(() => false)).toBe(true);
 
         // Read and verify decoder content
         const decoderContent = await fs.readFile(decoderFile, 'utf-8');
-        expect(decoderContent).toContain('MESSAGE_DEFINITIONS');
+        expect(decoderContent).toContain('TEST_MESSAGE_DEFINITIONS');
         expect(decoderContent).toContain('HEARTBEAT');
         expect(decoderContent).toContain('SYS_STATUS'); 
         expect(decoderContent).toContain('GLOBAL_POSITION_INT');
 
         // Test decoder functionality by loading the generated definitions
-        const { MESSAGE_DEFINITIONS } = await import(decoderFile);
+        const decoderModule = await import(decoderFile);
+        const MESSAGE_DEFINITIONS = decoderModule.TEST_MESSAGE_DEFINITIONS;
         expect(MESSAGE_DEFINITIONS).toHaveLength(3);
         
         // Verify message definitions structure
@@ -170,7 +171,7 @@ describe('MAVLink Integration Tests', () => {
           includeTypeGuards: false
         });
 
-        const decoderFile = join(testDistDir, 'dist', 'decoders', 'arrays.ts');
+        const decoderFile = join(testOutputDir, 'arrays', 'decoder.js');
         const decoderContent = await fs.readFile(decoderFile, 'utf-8');
         
         // Verify array fields are handled correctly
@@ -178,7 +179,8 @@ describe('MAVLink Integration Tests', () => {
         expect(decoderContent).toContain("name: 'satellite_prn'");
         expect(decoderContent).toContain("type: 'uint8_t'");
 
-        const { MESSAGE_DEFINITIONS } = await import(decoderFile);
+        const decoderModule = await import(decoderFile);
+        const MESSAGE_DEFINITIONS = decoderModule.ARRAYS_MESSAGE_DEFINITIONS;
         const gpsStatusDef = MESSAGE_DEFINITIONS.find((m: any) => m.name === 'GPS_STATUS');
         
         expect(gpsStatusDef).toBeDefined();
