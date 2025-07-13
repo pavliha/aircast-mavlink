@@ -1,51 +1,46 @@
 # Aircast MAVLink
 
-A comprehensive Node.js tool for working with MAVLink protocols, providing both TypeScript type generation from XML dialect files and real-time MAVLink message parsing.
+A comprehensive TypeScript/JavaScript library for working with MAVLink protocols, providing both TypeScript type generation from XML dialect files and robust real-time MAVLink message parsing with built-in frame parsing and buffering.
 
 ## Features
 
 ### Type Generation
 - Generate TypeScript interfaces from MAVLink XML dialects
-- Support for all MAVLink data types and enums
+- Support for all MAVLink data types and enums  
 - Type-safe enum definitions with numeric values (not string literals)
 - Batch processing of multiple dialects
 - CLI interface for easy integration
 
-### MAVLink Parser
-- Real-time MAVLink v1 and v2 message parsing
-- CRC validation for data integrity
-- Streaming data support with buffer management
-- Browser and Node.js compatibility
-- Web Worker and WebRTC integration examples
-- TCP/UDP connection handling
+### MAVLink Parser & Decoder  
+- **Complete message parsing** - Built-in frame parsing with `parseBytes()` API
+- **Protocol support** - MAVLink v1 and v2 message parsing
+- **Robust decoding** - Fixed array handling, proper field ordering, graceful error handling
+- **Buffering** - Automatic buffer management for partial messages
+- **Browser & Node.js** - Universal compatibility with Web Workers
+- **Dialect-specific parsers** - Generated parsers for each dialect (Common, ArduPilot, etc.)
 
 ## Installation
 
-### From GitHub Packages
-
-Since this is a public repository, you can install the package directly without authentication:
-
 ```bash
-# Global installation
-npm install -g @pavliha/aircast-mavlink --registry=https://npm.pkg.github.com
+# Install the package
+npm install @aircast-4g/mavlink
 
-# Local installation  
-npm install @pavliha/aircast-mavlink --registry=https://npm.pkg.github.com
+# Or with yarn
+yarn add @aircast-4g/mavlink
 ```
 
-**Alternative: Configure npm scope (one-time setup)**
-```bash
-# Configure npm to use GitHub Packages for @pavliha scope
-npm config set @pavliha:registry https://npm.pkg.github.com
+### CDN Usage (Browser)
 
-# Then install normally
-npm install @pavliha/aircast-mavlink
-```
+```html
+<!-- ES modules -->
+<script type="module">
+import { CommonParser } from 'https://esm.sh/@aircast-4g/mavlink@1.1.6/dist/dialects/common/index.js';
+</script>
 
-### Global Installation (Alternative)
-
-```bash
-npm install -g aircast-mavlink
+<!-- Or for specific dialects -->
+<script type="module">
+import { ArdupilotmegaParser } from 'https://esm.sh/@aircast-4g/mavlink@1.1.6/dist/dialects/ardupilotmega/index.js';
+</script>
 ```
 
 ### Local Development
@@ -136,12 +131,151 @@ node dist/cli.js list
 node dist/cli.js generate -i ./my-dialect.xml -o ./output/custom
 ```
 
+## Quick Start
+
+### Basic Message Parsing
+
+```typescript
+import { CommonParser } from '@aircast-4g/mavlink/dialects/common';
+
+// Create parser instance
+const parser = new CommonParser();
+
+// Parse raw MAVLink bytes
+const rawBytes = new Uint8Array([/* MAVLink frame data */]);
+const messages = parser.parseBytes(rawBytes);
+
+// Process messages
+messages.forEach(message => {
+  console.log(`Received ${message.message_name} from ${message.system_id}:${message.component_id}`);
+  console.log('Payload:', message.payload);
+});
+```
+
+### Web Worker Integration
+
+```typescript
+// worker.js
+import { ArdupilotmegaParser } from '@aircast-4g/mavlink/dialects/ardupilotmega';
+
+const parser = new ArdupilotmegaParser();
+
+self.onmessage = (event) => {
+  if (event.data.type === 'PARSE_MAVLINK') {
+    const messages = parser.parseBytes(event.data.data);
+    self.postMessage({ type: 'MESSAGES', messages });
+  }
+};
+```
+
+### Real-time Stream Processing
+
+```typescript
+import { CommonParser } from '@aircast-4g/mavlink/dialects/common';
+
+const parser = new CommonParser();
+
+// WebSocket example
+websocket.onmessage = (event) => {
+  const data = new Uint8Array(event.data);
+  const messages = parser.parseBytes(data);
+  
+  messages.forEach(msg => {
+    switch (msg.message_name) {
+      case 'HEARTBEAT':
+        updateSystemStatus(msg.payload);
+        break;
+      case 'GPS_RAW_INT':
+        updatePosition(msg.payload);
+        break;
+    }
+  });
+};
+```
+
+## API Reference
+
+### Dialect Parsers
+
+Each dialect has its own parser class with the same interface:
+
+```typescript
+// Available parsers
+import { CommonParser } from '@aircast-4g/mavlink/dialects/common';
+import { ArdupilotmegaParser } from '@aircast-4g/mavlink/dialects/ardupilotmega';
+import { MinimalParser } from '@aircast-4g/mavlink/dialects/minimal';
+import { StandardParser } from '@aircast-4g/mavlink/dialects/standard';
+import { TestParser } from '@aircast-4g/mavlink/dialects/test';
+
+// Parser interface
+class DialectParser {
+  // Parse raw bytes into messages (handles buffering internally)
+  parseBytes(data: Uint8Array): ParsedMAVLinkMessage[];
+  
+  // Decode a single frame 
+  decode(frame: MAVLinkFrame): ParsedMAVLinkMessage;
+  
+  // Get supported message IDs
+  getSupportedMessageIds(): number[];
+  
+  // Check if message ID is supported
+  supportsMessage(messageId: number): boolean;
+  
+  // Get message definition
+  getMessageDefinition(id: number): MessageDefinition | undefined;
+  
+  // Get dialect name
+  getDialectName(): string;
+  
+  // Reset internal buffer
+  resetBuffer(): void;
+}
+```
+
+### ParsedMAVLinkMessage
+
+```typescript
+interface ParsedMAVLinkMessage {
+  timestamp: number;      // Parse timestamp
+  system_id: number;      // MAVLink system ID
+  component_id: number;   // MAVLink component ID  
+  message_id: number;     // Message type ID
+  message_name: string;   // Human-readable message name
+  sequence: number;       // MAVLink sequence number
+  payload: Record<string, any>; // Decoded message fields
+  protocol_version: 1 | 2;      // MAVLink protocol version
+  checksum: number;       // Frame checksum
+  crc_ok: boolean;        // CRC validation result
+  signature?: Uint8Array; // MAVLink v2 signature (if present)
+  dialect?: string;       // Dialect name
+}
+```
+
+### Key Benefits of parseBytes()
+
+1. **Automatic Buffering** - Handles partial frames across multiple calls
+2. **Frame Synchronization** - Finds valid MAVLink frames in noisy data  
+3. **Protocol Detection** - Automatically detects MAVLink v1 vs v2
+4. **Robust Parsing** - Gracefully handles malformed data
+5. **Zero Configuration** - No setup required, just call parseBytes()
+
+```typescript
+const parser = new CommonParser();
+
+// Handle partial data - parser buffers automatically
+const part1 = new Uint8Array([0xFE, 0x09, 0x00]); // Partial frame
+const part2 = new Uint8Array([0x01, 0x01, 0x00, /* rest of frame */]);
+
+const messages1 = parser.parseBytes(part1); // [] - no complete messages
+const messages2 = parser.parseBytes(part2); // [message] - complete message
+```
+
 ### Programmatic Usage
 
 #### Type Generation
 
 ```typescript
-import { MAVLinkGenerator, generateTypesFromXML } from 'aircast-mavlink';
+import { MAVLinkGenerator, generateTypesFromXML } from '@aircast-4g/mavlink';
 
 // Generate from XML string
 const files = await generateTypesFromXML(xmlContent, {
@@ -170,91 +304,99 @@ await generator.generateFromURL(
     includeTypeGuards: true
   }
 );
+```
 
-// From local file
-await generator.generateFromFile('./dialect.xml', './output', {
-  dialectName: 'custom',
-  outputFormat: 'single',
-  includeEnums: true,
-  includeTypeGuards: false
+## Examples & Integration Patterns
+
+### Real-time Telemetry Processing
+
+```typescript
+import { CommonParser } from '@aircast-4g/mavlink/dialects/common';
+
+const parser = new CommonParser();
+
+// WebRTC data channel
+dataChannel.onmessage = (event) => {
+  const messages = parser.parseBytes(new Uint8Array(event.data));
+  messages.forEach(processMessage);
+};
+
+// WebSocket connection
+websocket.onmessage = (event) => {
+  const messages = parser.parseBytes(new Uint8Array(event.data));
+  messages.forEach(processMessage);
+};
+
+// TCP/UDP streams (Node.js)
+socket.on('data', (data) => {
+  const messages = parser.parseBytes(data);
+  messages.forEach(processMessage);
 });
 ```
 
-#### MAVLink Parsing
+### Message Filtering and Routing
 
 ```typescript
-import { 
-  MAVLinkParser, 
-  MAVLinkFrameParser, 
-  DialectParserFactory,
-  CRCCalculator
-} from 'aircast-mavlink';
-
-// Import pre-generated dialect types separately
-import * as CommonTypes from 'aircast-mavlink/types/common';
-import * as MinimalTypes from 'aircast-mavlink/types/minimal';
-import * as ArduPilotMegaTypes from 'aircast-mavlink/types/ardupilotmega';
-import * as StandardTypes from 'aircast-mavlink/types/standard';
-
-// Basic message parsing with async initialization
-const parser = new MAVLinkParser({ validateCRC: true });
-await parser.initialize(); // Initialize dialect parsers
-
-// Parse incoming data (Buffer or Uint8Array)
-const messages = await parser.parseBytes(incomingData);
-messages.forEach(message => {
-  console.log(`Message: ${message.message_name}`);
-  console.log(`From: ${message.system_id}:${message.component_id}`);
-  console.log(`Payload:`, message.payload);
-});
-
-// Advanced dialect-specific parsing
-const dialectParser = await DialectParserFactory.createParser('common');
-
-const frame = {
-  magic: 0xFD, length: 9, sequence: 1, system_id: 1, component_id: 1,
-  message_id: 0, payload: new Uint8Array([6, 3, 196, 144, 0, 0, 4, 0, 0]),
-  checksum: 0x1234, protocol_version: 2
-};
-
-const message = dialectParser.decode(frame);
-console.log('Decoded message:', message);
-
-// WebSocket integration example
-websocket.onmessage = async (event) => {
-  const data = new Uint8Array(event.data);
-  const messages = await parser.parseBytes(data);
-  
-  messages.forEach(msg => {
-    switch (msg.message_name) {
-      case 'HEARTBEAT':
-        updateConnectionStatus(msg.payload);
-        break;
-      case 'GPS_RAW_INT':
-        updatePosition(msg.payload);
-        break;
-      case 'ATTITUDE':
-        updateAttitude(msg.payload);
-        break;
-    }
-  });
-};
-
-// Using pre-generated types with parser
-function processMessage(msg: MAVLinkMessage) {
+function processMessage(msg: ParsedMAVLinkMessage) {
   switch (msg.message_name) {
     case 'HEARTBEAT':
-      // Type-safe access with CommonTypes
-      const heartbeat = msg.payload as CommonTypes.MessageHeartbeat;
-      console.log(`System type: ${heartbeat.type}`);
+      updateSystemStatus(msg.system_id, msg.payload);
       break;
     case 'GPS_RAW_INT':
-      const gps = msg.payload as CommonTypes.MessageGpsRawInt;
-      console.log(`Lat: ${gps.lat / 1e7}, Lon: ${gps.lon / 1e7}`);
+      updatePosition(msg.payload.lat / 1e7, msg.payload.lon / 1e7);
+      break;
+    case 'ATTITUDE':
+      updateAttitude(msg.payload.roll, msg.payload.pitch, msg.payload.yaw);
+      break;
+    case 'VFR_HUD':
+      updateHUD(msg.payload);
+      break;
+    case 'STATUSTEXT':
+      displayStatusMessage(msg.payload.text, msg.payload.severity);
       break;
   }
 }
 ```
+
+### Error Handling and Recovery
+
+```typescript
+try {
+  const messages = parser.parseBytes(incomingData);
+  messages.forEach(processMessage);
+} catch (error) {
+  console.error('Parse error:', error.message);
+  
+  // Reset parser buffer if needed
+  parser.resetBuffer();
+  
+  // Implement reconnection logic
+  scheduleReconnect();
+}
+```
+
+## Robustness & Features
+
+### Parser Robustness
+- **Fixed array decoding** - Proper handling of `uint8_t[8]` arrays without double nesting
+- **Graceful degradation** - Missing fields get sensible default values 
+- **Protocol version detection** - Automatic MAVLink v1/v2 detection
+- **Frame synchronization** - Finds valid frames in noisy data streams
+- **Buffer management** - Handles partial frames across data chunks
+- **Memory efficient** - Reuses buffers, minimal allocations
+
+### Decoder Features  
+- **All MAVLink types** - Support for `uint8_t`, `int32_t`, `float`, `double`, `char[N]`, arrays
+- **Little-endian parsing** - Correct byte order handling
+- **Unknown message handling** - Gracefully processes unsupported message types
+- **Field validation** - Bounds checking and safe defaults
+- **CRC validation** - Optional checksum verification (simplified implementation)
+
+### Testing & Quality
+- **Comprehensive tests** - 20+ test cases covering edge cases
+- **Generated decoder tests** - Validates HEARTBEAT, PROTOCOL_VERSION, arrays, partial payloads
+- **Frame parsing tests** - Tests v1/v2 protocols, multi-message buffers, invalid data
+- **CI/CD integration** - Automated testing on builds
 
 ## Pre-generated Types
 
@@ -616,27 +758,35 @@ node dist/cli.js generate -i https://raw.githubusercontent.com/mavlink/mavlink/m
 │   ├── types.ts                   # Shared type definitions
 │   ├── generator/                 # Type generation components
 │   │   ├── generator.ts           # Main generator class
-│   │   ├── template-engine.ts     # Handlebars template engine
+│   │   ├── template-engine.ts     # Handlebars template engine with decoder
 │   │   ├── type-converter.ts      # XML to TypeScript conversion
 │   │   ├── xml-parser.ts          # MAVLink XML parser
 │   │   └── batch-processor.ts     # Batch processing utilities
-│   └── parser/                    # MAVLink parsing components
-│       ├── index.ts               # Parser exports
-│       ├── mavlink-parser.ts      # Main parser class
-│       ├── frame-parser.ts        # Frame-level parsing
-│       ├── message-decoder.ts     # Message decoding
-│       ├── crc.ts                 # CRC calculation utilities
-│       └── types.ts               # Parser type definitions
-├── examples/                      # Usage examples and demos
-│   ├── README.md                  # Examples documentation
-│   ├── basic-parser.js            # Basic Node.js usage
-│   ├── nodejs-stream.js           # Advanced streaming patterns
-│   ├── web-worker-example.js      # Web Worker integration
-│   ├── webrtc-integration.html    # Complete web demo
-│   └── test-web.html              # Simple browser test
+│   └── generated/                 # Generated dialect parsers
+│       └── dialects/              # Generated parsers for each dialect
+│           ├── common/            # Common dialect parser + types
+│           ├── ardupilotmega/     # ArduPilot dialect parser + types
+│           ├── minimal/           # Minimal dialect parser + types
+│           ├── standard/          # Standard dialect parser + types
+│           └── test/              # Test dialect parser + types
 ├── tests/                         # Jest test files
-└── dist/                          # Compiled JavaScript output
+│   ├── decoder.test.ts            # Decoder functionality tests
+│   ├── template-engine.test.ts    # Template generation tests
+│   ├── xml-parser.test.ts         # XML parsing tests
+│   └── generator.test.ts          # End-to-end generation tests
+├── dist/                          # Compiled JavaScript output
+│   └── dialects/                  # Built dialect parsers for distribution
+└── examples/                      # Usage examples and demos
 ```
+
+### Generated Files Per Dialect
+
+Each dialect directory contains:
+- `decoder.ts` - Parser class with parseBytes() and decode() methods
+- `types.ts` - Base types and ParsedMAVLinkMessage interface  
+- `enums.ts` - Enum definitions and type aliases
+- `messages.ts` - Message interfaces and type guards
+- `index.ts` - Main export file
 
 ## License
 
