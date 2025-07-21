@@ -111,7 +111,10 @@ export class TypeConverter {
       fields: []
     };
 
-    for (const fieldDef of messageDef.fields) {
+    // Sort fields according to MAVLink wire format (largest types first)
+    const sortedFields = this.sortFieldsForWireFormat(messageDef.fields);
+
+    for (const fieldDef of sortedFields) {
       const tsField = this.convertField(fieldDef, enums);
       if (tsField) {
         tsMessage.fields.push(tsField);
@@ -119,6 +122,59 @@ export class TypeConverter {
     }
 
     return tsMessage;
+  }
+
+  private sortFieldsForWireFormat(fields: FieldDefinition[]): FieldDefinition[] {
+    // MAVLink reorders fields by size (largest first) for wire format efficiency
+    // Field size mapping based on MAVLink specification
+    const getFieldSize = (type: string): number => {
+      // Handle array types
+      const arrayMatch = type.match(/^(.+?)\[(\d+)\]$/);
+      if (arrayMatch) {
+        const baseType = arrayMatch[1];
+        const arrayLength = parseInt(arrayMatch[2], 10);
+        return this.getBaseTypeSize(baseType) * arrayLength;
+      }
+      return this.getBaseTypeSize(type);
+    };
+
+    // Create a copy of the fields array to avoid mutating the original
+    const sortedFields = [...fields];
+    
+    // Sort by field size (descending) then by original order (stable sort)
+    sortedFields.sort((a, b) => {
+      const sizeA = getFieldSize(a.type);
+      const sizeB = getFieldSize(b.type);
+      
+      if (sizeA !== sizeB) {
+        return sizeB - sizeA; // Larger fields first
+      }
+      
+      // If sizes are equal, maintain original order (stable sort)
+      return fields.indexOf(a) - fields.indexOf(b);
+    });
+
+    return sortedFields;
+  }
+
+  private getBaseTypeSize(type: string): number {
+    switch (type) {
+      case 'double': return 8;
+      case 'uint64_t': 
+      case 'int64_t': return 8;
+      case 'float':
+      case 'uint32_t':
+      case 'int32_t': return 4;
+      case 'uint16_t':
+      case 'int16_t': return 2;
+      case 'uint8_t':
+      case 'int8_t':
+      case 'char':
+      case 'uint8_t_mavlink_version': return 1;
+      default:
+        console.warn(`Unknown MAVLink type for size calculation: ${type}`);
+        return 1; // Default to 1 byte
+    }
   }
 
   private convertField(fieldDef: FieldDefinition, enums: TypeScriptEnum[]): TypeScriptField | null {
