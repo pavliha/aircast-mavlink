@@ -516,6 +516,213 @@ abstract class DialectParser {
   supportsMessage(messageId: number): boolean {
     return this.messageDefinitions.has(messageId);
   }
+
+  // Serialization methods for outgoing commands
+  serializeMessage(message: Record<string, unknown> & { message_name: string }): Uint8Array {
+    const messageDef = Array.from(this.messageDefinitions.values())
+      .find(def => def.name === message.message_name);
+    
+    if (!messageDef) {
+      throw new Error(\`Unknown message type: \${message.message_name}\`);
+    }
+
+    const payload = this.serializePayload(message, messageDef.fields);
+    return this.createMAVLinkFrame(message, messageDef.id, payload);
+  }
+
+  private serializePayload(message: Record<string, unknown>, fields: FieldDefinition[]): Uint8Array {
+    // Calculate total payload size
+    let totalSize = 0;
+    for (const field of fields) {
+      totalSize += this.getFieldSize(field.type);
+    }
+
+    const buffer = new ArrayBuffer(totalSize);
+    const view = new DataView(buffer);
+    let offset = 0;
+
+    for (const field of fields) {
+      const value = message[field.name];
+      const bytesWritten = this.serializeField(view, offset, field, value);
+      offset += bytesWritten;
+    }
+
+    return new Uint8Array(buffer);
+  }
+
+  private serializeField(view: DataView, offset: number, field: FieldDefinition, value: unknown): number {
+    const isArray = field.arrayLength !== undefined;
+    const arrayLength = field.arrayLength || 1;
+    
+    if (isArray && arrayLength > 1) {
+      let totalBytes = 0;
+      let baseType = field.type;
+      if (baseType.includes('[') && baseType.includes(']')) {
+        baseType = baseType.substring(0, baseType.indexOf('['));
+      }
+      
+      const arrayValue = Array.isArray(value) ? value : [value];
+      for (let i = 0; i < arrayLength; i++) {
+        const itemValue = i < arrayValue.length ? arrayValue[i] : this.getDefaultValueForType(baseType);
+        const bytesWritten = this.serializeSingleValue(view, offset + totalBytes, baseType, itemValue);
+        totalBytes += bytesWritten;
+      }
+      return totalBytes;
+    } else {
+      return this.serializeSingleValue(view, offset, field.type, value);
+    }
+  }
+
+  private serializeSingleValue(view: DataView, offset: number, type: string, value: unknown): number {
+    const actualValue = value ?? this.getDefaultValueForType(type);
+    
+    switch (type) {
+      case 'uint8_t':
+        view.setUint8(offset, Number(actualValue));
+        return 1;
+      case 'int8_t':
+        view.setInt8(offset, Number(actualValue));
+        return 1;
+      case 'uint16_t':
+        view.setUint16(offset, Number(actualValue), true);
+        return 2;
+      case 'int16_t':
+        view.setInt16(offset, Number(actualValue), true);
+        return 2;
+      case 'uint32_t':
+        view.setUint32(offset, Number(actualValue), true);
+        return 4;
+      case 'int32_t':
+        view.setInt32(offset, Number(actualValue), true);
+        return 4;
+      case 'uint64_t':
+        view.setBigUint64(offset, typeof actualValue === 'bigint' ? actualValue : BigInt(Number(actualValue) || 0), true);
+        return 8;
+      case 'int64_t':
+        view.setBigInt64(offset, typeof actualValue === 'bigint' ? actualValue : BigInt(Number(actualValue) || 0), true);
+        return 8;
+      case 'float':
+        view.setFloat32(offset, Number(actualValue), true);
+        return 4;
+      case 'double':
+        view.setFloat64(offset, Number(actualValue), true);
+        return 8;
+      case 'char':
+        view.setUint8(offset, typeof actualValue === 'string' ? actualValue.charCodeAt(0) : Number(actualValue));
+        return 1;
+      default:
+        if (type.startsWith('char[') && type.endsWith(']')) {
+          const length = parseInt(type.slice(5, -1));
+          const str = String(actualValue);
+          for (let i = 0; i < length; i++) {
+            const charCode = i < str.length ? str.charCodeAt(i) : 0;
+            view.setUint8(offset + i, charCode);
+          }
+          return length;
+        }
+        view.setUint8(offset, Number(actualValue));
+        return 1;
+    }
+  }
+
+  private getFieldSize(type: string): number {
+    if (type.includes('[') && type.includes(']')) {
+      const baseType = type.substring(0, type.indexOf('['));
+      const arrayLength = parseInt(type.substring(type.indexOf('[') + 1, type.indexOf(']')));
+      return this.getSingleFieldSize(baseType) * arrayLength;
+    }
+    return this.getSingleFieldSize(type);
+  }
+
+  private getSingleFieldSize(type: string): number {
+    switch (type) {
+      case 'uint8_t':
+      case 'int8_t':
+      case 'char':
+        return 1;
+      case 'uint16_t':
+      case 'int16_t':
+        return 2;
+      case 'uint32_t':
+      case 'int32_t':
+      case 'float':
+        return 4;
+      case 'uint64_t':
+      case 'int64_t':
+      case 'double':
+        return 8;
+      default:
+        return 1;
+    }
+  }
+
+  private getDefaultValueForType(type: string): number | bigint {
+    switch (type) {
+      case 'uint8_t':
+      case 'int8_t':
+      case 'uint16_t':
+      case 'int16_t':
+      case 'uint32_t':
+      case 'int32_t':
+      case 'float':
+      case 'double':
+        return 0;
+      case 'uint64_t':
+      case 'int64_t':
+        return 0n;
+      case 'char':
+        return 0;
+      default:
+        return 0;
+    }
+  }
+
+  private createMAVLinkFrame(message: Record<string, unknown>, messageId: number, payload: Uint8Array): Uint8Array {
+    const magic = 0xFD; // Use MAVLink v2
+    const systemId = typeof message.system_id === 'number' ? message.system_id : 1;
+    const componentId = typeof message.component_id === 'number' ? message.component_id : 1;
+    const sequence = typeof message.sequence === 'number' ? message.sequence : 0;
+    
+    // MAVLink v2 header: magic(1) + len(1) + incompat_flags(1) + compat_flags(1) + seq(1) + sysid(1) + compid(1) + msgid(3) + payload + checksum(2)
+    const headerSize = 10;
+    const frameSize = headerSize + payload.length + 2;
+    const buffer = new ArrayBuffer(frameSize);
+    const view = new DataView(buffer);
+    
+    let offset = 0;
+    
+    // Header
+    view.setUint8(offset++, magic);
+    view.setUint8(offset++, payload.length);
+    view.setUint8(offset++, 0); // incompat_flags
+    view.setUint8(offset++, 0); // compat_flags
+    view.setUint8(offset++, sequence);
+    view.setUint8(offset++, systemId);
+    view.setUint8(offset++, componentId);
+    
+    // 24-bit message ID (little endian)
+    view.setUint8(offset++, messageId & 0xFF);
+    view.setUint8(offset++, (messageId >> 8) & 0xFF);
+    view.setUint8(offset++, (messageId >> 16) & 0xFF);
+    
+    // Payload
+    const payloadView = new Uint8Array(buffer, offset, payload.length);
+    payloadView.set(payload);
+    offset += payload.length;
+    
+    // Calculate checksum (simplified - using sum of all bytes)
+    let checksum = 0;
+    for (let i = 1; i < offset; i++) {
+      checksum += view.getUint8(i);
+    }
+    checksum &= 0xFFFF;
+    
+    // Checksum (little endian)
+    view.setUint8(offset++, checksum & 0xFF);
+    view.setUint8(offset++, (checksum >> 8) & 0xFF);
+    
+    return new Uint8Array(buffer);
+  }
 }
 
 {{#if messages}}
@@ -563,6 +770,30 @@ export class {{capitalize dialectName}}Parser extends DialectParser {
     for (const def of MESSAGE_DEFINITIONS) {
       this.messageDefinitions.set(def.id, def);
     }
+  }
+}
+
+// Dialect-specific serializer
+export class {{capitalize dialectName}}Serializer {
+  private parser: {{capitalize dialectName}}Parser;
+
+  constructor() {
+    this.parser = new {{capitalize dialectName}}Parser();
+  }
+
+  // Serialize a message to MAVLink bytes
+  serialize(message: Record<string, unknown> & { message_name: string }): Uint8Array {
+    return this.parser.serializeMessage(message);
+  }
+
+  // Get supported message names for this dialect
+  getSupportedMessages(): string[] {
+    return Array.from(this.parser['messageDefinitions'].values()).map(def => def.name);
+  }
+
+  // Check if a message is supported by this dialect
+  supportsMessage(messageName: string): boolean {
+    return Array.from(this.parser['messageDefinitions'].values()).some(def => def.name === messageName);
   }
 }
 `));

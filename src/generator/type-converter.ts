@@ -111,8 +111,8 @@ export class TypeConverter {
       fields: []
     };
 
-    // Sort fields according to MAVLink wire format (largest types first)
-    const sortedFields = this.sortFieldsForWireFormat(messageDef.fields);
+    // Use fields in their original XML order for correct MAVLink serialization
+    const sortedFields = messageDef.fields;
 
     for (const fieldDef of sortedFields) {
       const tsField = this.convertField(fieldDef, enums);
