@@ -213,11 +213,8 @@ export class TypeConverter {
   }
 
   private convertFieldName(name: string): string {
-    // Convert snake_case to camelCase
-    const words = name.split('_');
-    return words[0].toLowerCase() + words.slice(1)
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join('');
+    // Keep snake_case format (no conversion)
+    return name.toLowerCase();
   }
 
   private convertFieldType(type: string, enumName: string | undefined, enums: TypeScriptEnum[]): string {

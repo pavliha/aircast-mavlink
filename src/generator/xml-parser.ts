@@ -42,6 +42,17 @@ export class XMLParser {
     mavlinkData: MAVLinkDialect,
     source: string
   ): Promise<MAVLinkDialectDefinition> {
+    if (!mavlinkData) {
+      // Return empty definition for XML without mavlink root
+      return {
+        version: undefined,
+        dialect: undefined,
+        includes: [],
+        enums: [],
+        messages: []
+      };
+    }
+    
     const definition: MAVLinkDialectDefinition = {
       version: mavlinkData.version,
       dialect: mavlinkData.dialect ? parseInt(mavlinkData.dialect) : undefined,
@@ -110,8 +121,9 @@ export class XMLParser {
       return url.toString();
     }
 
-    // Otherwise, assume it's a file path
-    return include;
+    // Otherwise, resolve relative to the directory of the source file
+    const path = require('path');
+    return path.resolve(path.dirname(source), include);
   }
 
   private processEnum(enumData: XMLEnum): EnumDefinition | null {
@@ -165,6 +177,12 @@ export class XMLParser {
         }
 
         if (typeof field === 'object' && field.$ && field.$.name && field.$.type) {
+          // Skip fields named "extensions" as they are markers, not actual fields
+          if (field.$.name === 'extensions') {
+            inExtensions = true;
+            continue;
+          }
+          
           const fieldDef: FieldDefinition = {
             name: field.$.name,
             type: field.$.type,

@@ -1,0 +1,567 @@
+import { TypeConverter } from '../src/generator/type-converter';
+import { MAVLinkDialectDefinition, EnumDefinition, MessageDefinition, FieldDefinition } from '../src/types';
+
+describe('TypeConverter Enhanced Coverage Tests', () => {
+  let converter: TypeConverter;
+
+  beforeEach(() => {
+    converter = new TypeConverter();
+  });
+
+  describe('convert method edge cases', () => {
+    test('should handle definition without enums array', () => {
+      const definition: MAVLinkDialectDefinition = {
+        messages: [
+          {
+            id: 1,
+            name: 'TEST_MESSAGE',
+            description: 'Test message',
+            fields: [
+              { name: 'field1', type: 'uint8_t', description: 'Test field' }
+            ]
+          }
+        ]
+      };
+
+      const result = converter.convert(definition, 'test');
+      expect(result.enums).toHaveLength(0);
+      expect(result.messages).toHaveLength(1);
+    });
+
+    test('should handle definition without messages array', () => {
+      const definition: MAVLinkDialectDefinition = {
+        enums: [
+          {
+            name: 'TEST_ENUM',
+            description: 'Test enum',
+            bitmask: false,
+            entries: [
+              { name: 'VALUE_1', value: '1', description: 'First value' }
+            ]
+          }
+        ]
+      };
+
+      const result = converter.convert(definition, 'test');
+      expect(result.enums).toHaveLength(1);
+      expect(result.messages).toHaveLength(0);
+    });
+
+    test('should merge duplicate enums correctly', () => {
+      const definition: MAVLinkDialectDefinition = {
+        enums: [
+          {
+            name: 'DUPLICATE_ENUM',
+            description: 'First description',
+            bitmask: false,
+            entries: [
+              { name: 'VALUE_1', value: '1', description: 'First value' }
+            ]
+          },
+          {
+            name: 'DUPLICATE_ENUM',
+            description: 'Second description',
+            bitmask: false,
+            entries: [
+              { name: 'VALUE_2', value: '2', description: 'Second value' }
+            ]
+          }
+        ]
+      };
+
+      const result = converter.convert(definition, 'test');
+      
+      expect(result.enums).toHaveLength(1);
+      expect(result.enums[0].name).toBe('DUPLICATE_ENUM');
+      expect(result.enums[0].values).toHaveLength(2);
+      expect(result.enums[0].description).toEqual(['First description', 'Second description']);
+    });
+
+    test('should not duplicate values when merging enums', () => {
+      const definition: MAVLinkDialectDefinition = {
+        enums: [
+          {
+            name: 'SAME_ENUM',
+            description: 'Test enum',
+            bitmask: false,
+            entries: [
+              { name: 'SAME_VALUE', value: '1', description: 'First occurrence' }
+            ]
+          },
+          {
+            name: 'SAME_ENUM',
+            description: 'Test enum again',
+            bitmask: false,
+            entries: [
+              { name: 'SAME_VALUE', value: '1', description: 'Second occurrence' },
+              { name: 'DIFFERENT_VALUE', value: '2', description: 'Different value' }
+            ]
+          }
+        ]
+      };
+
+      const result = converter.convert(definition, 'test');
+      
+      expect(result.enums).toHaveLength(1);
+      expect(result.enums[0].values).toHaveLength(2);
+      expect(result.enums[0].values.find(v => v.name === 'SAME_VALUE')).toBeDefined();
+      expect(result.enums[0].values.find(v => v.name === 'DIFFERENT_VALUE')).toBeDefined();
+    });
+  });
+
+  describe('convertEnum edge cases', () => {
+    test('should return null for undefined enum definition', () => {
+      const result = (converter as any).convertEnum(undefined);
+      expect(result).toBeNull();
+    });
+
+    test('should return null for enum without name', () => {
+      const enumDef: EnumDefinition = {
+        name: '',
+        description: 'No name enum',
+        bitmask: false,
+        entries: [
+          { name: 'VALUE_1', value: '1', description: 'Test value' }
+        ]
+      };
+
+      const result = (converter as any).convertEnum(enumDef);
+      expect(result).toBeNull();
+    });
+
+    test('should return null for enum without entries', () => {
+      const enumDef: EnumDefinition = {
+        name: 'EMPTY_ENUM',
+        description: 'Empty enum',
+        bitmask: false,
+        entries: []
+      };
+
+      const result = (converter as any).convertEnum(enumDef);
+      expect(result).toBeNull();
+    });
+
+    test('should return null for enum with null entries', () => {
+      const enumDef: EnumDefinition = {
+        name: 'NULL_ENTRIES_ENUM',
+        description: 'Null entries enum',
+        bitmask: false,
+        entries: null as any
+      };
+
+      const result = (converter as any).convertEnum(enumDef);
+      expect(result).toBeNull();
+    });
+
+    test('should handle enum with bitmask flag', () => {
+      const enumDef: EnumDefinition = {
+        name: 'BITMASK_ENUM',
+        description: 'Bitmask enum',
+        bitmask: true,
+        entries: [
+          { name: 'FLAG_1', value: '1', description: 'First flag' },
+          { name: 'FLAG_2', value: '2', description: 'Second flag' }
+        ]
+      };
+
+      const result = (converter as any).convertEnum(enumDef);
+      expect(result).toBeDefined();
+      expect(result.bitmask).toBe(true);
+    });
+
+    test('should filter out enum values that fail parsing', () => {
+      const enumDef: EnumDefinition = {
+        name: 'MIXED_VALUES_ENUM',
+        description: 'Mixed values enum',
+        bitmask: false,
+        entries: [
+          { name: 'VALID_VALUE', value: '1', description: 'Valid' },
+          { name: 'INVALID_VALUE', value: 'not-a-number', description: 'Invalid' },
+          { name: 'ANOTHER_VALID', value: '2', description: 'Another valid' }
+        ]
+      };
+
+      const result = (converter as any).convertEnum(enumDef);
+      expect(result).toBeDefined();
+      expect(result.values).toHaveLength(2);
+      expect(result.values[0].name).toBe('VALID_VALUE');
+      expect(result.values[1].name).toBe('ANOTHER_VALID');
+    });
+  });
+
+  describe('convertMessage edge cases', () => {
+    test('should return null for message without name', () => {
+      const messageDef: MessageDefinition = {
+        id: 1,
+        name: '',
+        description: 'No name message',
+        fields: []
+      };
+
+      const result = (converter as any).convertMessage(messageDef, []);
+      expect(result).toBeNull();
+    });
+
+    test('should return null for message without fields', () => {
+      const messageDef: MessageDefinition = {
+        id: 1,
+        name: 'NO_FIELDS_MESSAGE',
+        description: 'No fields message',
+        fields: null as any
+      };
+
+      const result = (converter as any).convertMessage(messageDef, []);
+      expect(result).toBeNull();
+    });
+
+    test('should handle message with extension fields', () => {
+      const messageDef: MessageDefinition = {
+        id: 1,
+        name: 'EXTENSION_MESSAGE',
+        description: 'Message with extensions',
+        fields: [
+          { name: 'normal_field', type: 'uint8_t', description: 'Normal field' },
+          { name: 'extension_field', type: 'uint16_t', description: 'Extension field', extension: true }
+        ]
+      };
+
+      const result = (converter as any).convertMessage(messageDef, []);
+      expect(result).toBeDefined();
+      expect(result.fields).toHaveLength(2);
+      expect(result.fields[0].optional).toBe(false);
+      expect(result.fields[1].optional).toBe(true);
+      expect(result.fields[1].extension).toBe(true);
+    });
+
+    test('should filter out null fields from convertField', () => {
+      const messageDef: MessageDefinition = {
+        id: 1,
+        name: 'FILTERED_MESSAGE',
+        description: 'Message with null fields',
+        fields: [
+          { name: 'valid_field', type: 'uint8_t', description: 'Valid field' },
+          { name: '', type: 'uint8_t', description: 'Invalid field - no name' },
+          { name: 'another_valid', type: 'uint16_t', description: 'Another valid' }
+        ]
+      };
+
+      const result = (converter as any).convertMessage(messageDef, []);
+      expect(result).toBeDefined();
+      expect(result.fields).toHaveLength(2);
+      expect(result.fields[0].name).toBe('valid_field');
+      expect(result.fields[1].name).toBe('another_valid');
+    });
+  });
+
+  describe('convertField edge cases', () => {
+    test('should return null for field without name', () => {
+      const fieldDef: FieldDefinition = {
+        name: '',
+        type: 'uint8_t',
+        description: 'No name field'
+      };
+
+      const result = (converter as any).convertField(fieldDef, []);
+      expect(result).toBeNull();
+    });
+
+    test('should return null for field without type', () => {
+      const fieldDef: FieldDefinition = {
+        name: 'no_type_field',
+        type: '',
+        description: 'No type field'
+      };
+
+      const result = (converter as any).convertField(fieldDef, []);
+      expect(result).toBeNull();
+    });
+
+    test('should handle array field types correctly', () => {
+      const fieldDef: FieldDefinition = {
+        name: 'array_field',
+        type: 'uint8_t[16]',
+        description: 'Array field'
+      };
+
+      const result = (converter as any).convertField(fieldDef, []);
+      expect(result).toBeDefined();
+      expect(result.arrayLength).toBe(16);
+      expect(result.originalType).toBe('uint8_t');
+      expect(result.type).toBe('number[]');
+    });
+
+    test('should handle char array as string', () => {
+      const fieldDef: FieldDefinition = {
+        name: 'string_field',
+        type: 'char[50]',
+        description: 'String field'
+      };
+
+      const result = (converter as any).convertField(fieldDef, []);
+      expect(result).toBeDefined();
+      expect(result.type).toBe('string');
+      expect(result.arrayLength).toBe(50);
+    });
+  });
+
+  describe('type conversion edge cases', () => {
+    test('should handle unknown enum in field type', () => {
+      const fieldDef: FieldDefinition = {
+        name: 'enum_field',
+        type: 'uint8_t',
+        enum: 'UNKNOWN_ENUM',
+        description: 'Enum field with unknown enum'
+      };
+
+      const result = (converter as any).convertField(fieldDef, []);
+      expect(result).toBeDefined();
+      expect(result.type).toBe('number'); // Falls back to base type
+    });
+
+    test('should handle enum type that exists in enums list', () => {
+      const enums = [
+        {
+          name: 'KNOWN_ENUM',
+          description: [],
+          values: [],
+          bitmask: false
+        }
+      ];
+
+      const fieldDef: FieldDefinition = {
+        name: 'enum_field',
+        type: 'uint8_t',
+        enum: 'KNOWN_ENUM',
+        description: 'Enum field'
+      };
+
+      const result = (converter as any).convertField(fieldDef, enums);
+      expect(result).toBeDefined();
+      expect(result.type).toBe('KNOWN_ENUM');
+    });
+
+    test('should recognize enum type by name in field type', () => {
+      const enums = [
+        {
+          name: 'DIRECT_ENUM_TYPE',
+          description: [],
+          values: [],
+          bitmask: false
+        }
+      ];
+
+      const fieldDef: FieldDefinition = {
+        name: 'enum_field',
+        type: 'DIRECT_ENUM_TYPE',
+        description: 'Direct enum type field'
+      };
+
+      const result = (converter as any).convertField(fieldDef, enums);
+      expect(result).toBeDefined();
+      expect(result.type).toBe('DIRECT_ENUM_TYPE');
+    });
+
+    test('should default to unknown for unrecognized types', () => {
+      const fieldDef: FieldDefinition = {
+        name: 'unknown_field',
+        type: 'completely_unknown_type',
+        description: 'Unknown type field'
+      };
+
+      const result = (converter as any).convertField(fieldDef, []);
+      expect(result).toBeDefined();
+      expect(result.type).toBe('unknown');
+    });
+  });
+
+  describe('parseEnumValue edge cases', () => {
+    test('should return null for empty value', () => {
+      const result = (converter as any).parseEnumValue('');
+      expect(result).toBeNull();
+    });
+
+    test('should return null for null value', () => {
+      const result = (converter as any).parseEnumValue(null);
+      expect(result).toBeNull();
+    });
+
+    test('should handle binary values', () => {
+      const result = (converter as any).parseEnumValue('0b1010');
+      expect(result).toBe(10);
+    });
+
+    test('should handle hexadecimal values', () => {
+      const result = (converter as any).parseEnumValue('0xFF');
+      expect(result).toBe(255);
+    });
+
+    test('should handle power operations', () => {
+      const result = (converter as any).parseEnumValue('2**8');
+      expect(result).toBe(256);
+    });
+
+    test('should handle invalid power operations', () => {
+      const result = (converter as any).parseEnumValue('2**');
+      expect(isNaN(result) || result === null).toBe(true);
+    });
+
+    test('should handle multiple power signs', () => {
+      const result = (converter as any).parseEnumValue('2**3**2');
+      // Implementation only handles first ** operation
+      expect(typeof result).toBe('number');
+    });
+
+    test('should return null for non-numeric values', () => {
+      const result = (converter as any).parseEnumValue('not-a-number');
+      expect(result).toBeNull();
+    });
+
+    test('should handle regular integers', () => {
+      const result = (converter as any).parseEnumValue('42');
+      expect(result).toBe(42);
+    });
+
+    test('should handle negative integers', () => {
+      const result = (converter as any).parseEnumValue('-42');
+      expect(result).toBe(-42);
+    });
+  });
+
+  describe('getBaseTypeSize edge cases', () => {
+    test('should warn about unknown types and return 1', () => {
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      
+      const result = (converter as any).getBaseTypeSize('unknown_mavlink_type');
+      
+      expect(result).toBe(1);
+      expect(consoleSpy).toHaveBeenCalledWith('Unknown MAVLink type for size calculation: unknown_mavlink_type');
+      
+      consoleSpy.mockRestore();
+    });
+
+    test('should handle all known MAVLink types correctly', () => {
+      const testCases = [
+        { type: 'double', expectedSize: 8 },
+        { type: 'uint64_t', expectedSize: 8 },
+        { type: 'int64_t', expectedSize: 8 },
+        { type: 'float', expectedSize: 4 },
+        { type: 'uint32_t', expectedSize: 4 },
+        { type: 'int32_t', expectedSize: 4 },
+        { type: 'uint16_t', expectedSize: 2 },
+        { type: 'int16_t', expectedSize: 2 },
+        { type: 'uint8_t', expectedSize: 1 },
+        { type: 'int8_t', expectedSize: 1 },
+        { type: 'char', expectedSize: 1 },
+        { type: 'uint8_t_mavlink_version', expectedSize: 1 }
+      ];
+
+      testCases.forEach(({ type, expectedSize }) => {
+        const result = (converter as any).getBaseTypeSize(type);
+        expect(result).toBe(expectedSize);
+      });
+    });
+  });
+
+  describe('sortFieldsForWireFormat', () => {
+    test('should sort fields by size correctly', () => {
+      const fields: FieldDefinition[] = [
+        { name: 'small_field', type: 'uint8_t', description: 'Small field' },
+        { name: 'large_field', type: 'double', description: 'Large field' },
+        { name: 'medium_field', type: 'uint32_t', description: 'Medium field' }
+      ];
+
+      const result = (converter as any).sortFieldsForWireFormat(fields);
+      
+      expect(result).toHaveLength(3);
+      expect(result[0].name).toBe('large_field'); // 8 bytes
+      expect(result[1].name).toBe('medium_field'); // 4 bytes
+      expect(result[2].name).toBe('small_field'); // 1 byte
+    });
+
+    test('should handle array types in sorting', () => {
+      const fields: FieldDefinition[] = [
+        { name: 'single_byte', type: 'uint8_t', description: 'Single byte' },
+        { name: 'byte_array', type: 'uint8_t[10]', description: 'Byte array' },
+        { name: 'int_array', type: 'uint32_t[2]', description: 'Int array' }
+      ];
+
+      const result = (converter as any).sortFieldsForWireFormat(fields);
+      
+      expect(result).toHaveLength(3);
+      expect(result[0].name).toBe('byte_array'); // 10 bytes
+      expect(result[1].name).toBe('int_array'); // 8 bytes
+      expect(result[2].name).toBe('single_byte'); // 1 byte
+    });
+
+    test('should maintain original order for fields of same size', () => {
+      const fields: FieldDefinition[] = [
+        { name: 'first_byte', type: 'uint8_t', description: 'First byte' },
+        { name: 'second_byte', type: 'uint8_t', description: 'Second byte' },
+        { name: 'third_byte', type: 'int8_t', description: 'Third byte' }
+      ];
+
+      const result = (converter as any).sortFieldsForWireFormat(fields);
+      
+      expect(result).toHaveLength(3);
+      expect(result[0].name).toBe('first_byte');
+      expect(result[1].name).toBe('second_byte');
+      expect(result[2].name).toBe('third_byte');
+    });
+  });
+
+  describe('parseDescription', () => {
+    test('should handle undefined description', () => {
+      const result = (converter as any).parseDescription(undefined);
+      expect(result).toEqual([]);
+    });
+
+    test('should handle empty string description', () => {
+      const result = (converter as any).parseDescription('');
+      expect(result).toEqual([]);
+    });
+
+    test('should split multiline descriptions', () => {
+      const result = (converter as any).parseDescription('Line 1\nLine 2\nLine 3');
+      expect(result).toEqual(['Line 1', 'Line 2', 'Line 3']);
+    });
+
+    test('should handle single line description', () => {
+      const result = (converter as any).parseDescription('Single line description');
+      expect(result).toEqual(['Single line description']);
+    });
+  });
+
+  describe('convertMessageName', () => {
+    test('should convert UPPER_CASE to PascalCase', () => {
+      const result = (converter as any).convertMessageName('TEST_MESSAGE_NAME');
+      expect(result).toBe('TestMessageName');
+    });
+
+    test('should handle single word', () => {
+      const result = (converter as any).convertMessageName('HEARTBEAT');
+      expect(result).toBe('Heartbeat');
+    });
+
+    test('should handle lowercase input', () => {
+      const result = (converter as any).convertMessageName('test_message');
+      expect(result).toBe('TestMessage');
+    });
+  });
+
+  describe('convertFieldName', () => {
+    test('should keep snake_case format', () => {
+      const result = (converter as any).convertFieldName('TEST_FIELD_NAME');
+      expect(result).toBe('test_field_name');
+    });
+
+    test('should convert to lowercase', () => {
+      const result = (converter as any).convertFieldName('UPPERCASE_FIELD');
+      expect(result).toBe('uppercase_field');
+    });
+
+    test('should handle already lowercase input', () => {
+      const result = (converter as any).convertFieldName('already_lowercase');
+      expect(result).toBe('already_lowercase');
+    });
+  });
+});

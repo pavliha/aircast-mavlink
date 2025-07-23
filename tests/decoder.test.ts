@@ -33,7 +33,7 @@ describe('Generated Decoder Tests', () => {
 
     test('should decode HEARTBEAT message correctly', () => {
       // Create a valid MAVLink frame for HEARTBEAT
-      // Field order: type, autopilot, baseMode, customMode, systemStatus, mavlinkVersion
+      // Field order: type, autopilot, base_mode, custom_mode, system_status, mavlink_version
       const frame = {
         magic: 0xFE,
         length: 9,
@@ -67,10 +67,10 @@ describe('Generated Decoder Tests', () => {
       // Check payload fields
       expect(result.payload.type).toBe(1);
       expect(result.payload.autopilot).toBe(3);
-      expect(result.payload.baseMode).toBe(141);
-      expect(result.payload.customMode).toBe(4);
-      expect(result.payload.systemStatus).toBe(4);
-      expect(result.payload.mavlinkVersion).toBe(3);
+      expect(result.payload.base_mode).toBe(141);
+      expect(result.payload.custom_mode).toBe(4);
+      expect(result.payload.system_status).toBe(4);
+      expect(result.payload.mavlink_version).toBe(3);
     });
 
     test('should decode PROTOCOL_VERSION message correctly', () => {
@@ -100,10 +100,10 @@ describe('Generated Decoder Tests', () => {
       expect(result.protocol_version).toBe(2);
 
       expect(result.payload.version).toBe(200);
-      expect(result.payload.minVersion).toBe(100);
-      expect(result.payload.maxVersion).toBe(300);
-      expect(result.payload.specVersionHash).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-      expect(result.payload.libraryVersionHash).toEqual([17, 18, 19, 20, 21, 22, 23, 24]);
+      expect(result.payload.min_version).toBe(100);
+      expect(result.payload.max_version).toBe(300);
+      expect(result.payload.spec_version_hash).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(result.payload.library_version_hash).toEqual([17, 18, 19, 20, 21, 22, 23, 24]);
     });
 
     test('should handle unknown message ID', () => {
@@ -131,7 +131,7 @@ describe('Generated Decoder Tests', () => {
       // HEARTBEAT with incomplete payload - only first 4 fields
       const frame = {
         magic: 0xFE,
-        length: 7, // type(1) + autopilot(1) + baseMode(1) + customMode(4) = 7 bytes
+        length: 7, // type(1) + autopilot(1) + base_mode(1) + custom_mode(4) = 7 bytes
         sequence: 1,
         system_id: 1,
         component_id: 1,
@@ -139,8 +139,8 @@ describe('Generated Decoder Tests', () => {
         payload: new Uint8Array([
           0x01,                   // type
           0x03,                   // autopilot  
-          0x8D,                   // baseMode
-          0x04, 0x00, 0x00, 0x00  // customMode
+          0x8D,                   // base_mode
+          0x04, 0x00, 0x00, 0x00  // custom_mode
         ]),
         checksum: 0x1234,
         crc_ok: true,
@@ -152,11 +152,11 @@ describe('Generated Decoder Tests', () => {
       expect(result.message_name).toBe('HEARTBEAT');
       expect(result.payload.type).toBe(1);
       expect(result.payload.autopilot).toBe(3);
-      expect(result.payload.baseMode).toBe(141);
-      expect(result.payload.customMode).toBe(4);
+      expect(result.payload.base_mode).toBe(141);
+      expect(result.payload.custom_mode).toBe(4);
       // Missing fields should have default values
-      expect(result.payload.systemStatus).toBe(0);
-      expect(result.payload.mavlinkVersion).toBe(0);
+      expect(result.payload.system_status).toBe(0);
+      expect(result.payload.mavlink_version).toBe(0);
     });
 
     test('should handle empty payload', () => {
@@ -179,10 +179,10 @@ describe('Generated Decoder Tests', () => {
       // All fields should have default values
       expect(result.payload.type).toBe(0);
       expect(result.payload.autopilot).toBe(0);
-      expect(result.payload.baseMode).toBe(0);
-      expect(result.payload.customMode).toBe(0);
-      expect(result.payload.systemStatus).toBe(0);
-      expect(result.payload.mavlinkVersion).toBe(0);
+      expect(result.payload.base_mode).toBe(0);
+      expect(result.payload.custom_mode).toBe(0);
+      expect(result.payload.system_status).toBe(0);
+      expect(result.payload.mavlink_version).toBe(0);
     });
 
     test('should get message definition', () => {
@@ -246,8 +246,8 @@ describe('Generated Decoder Tests', () => {
 
       const result = parser.decode(frame);
 
-      expect(result.payload.specVersionHash).toEqual([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11, 0x22]);
-      expect(result.payload.libraryVersionHash).toEqual([0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA]);
+      expect(result.payload.spec_version_hash).toEqual([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11, 0x22]);
+      expect(result.payload.library_version_hash).toEqual([0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA]);
     });
 
     test('should handle partial arrays', () => {
@@ -272,11 +272,11 @@ describe('Generated Decoder Tests', () => {
       const result = parser.decode(frame);
 
       expect(result.payload.version).toBe(200);
-      expect(result.payload.minVersion).toBe(100);
-      expect(result.payload.maxVersion).toBe(300);
+      expect(result.payload.min_version).toBe(100);
+      expect(result.payload.max_version).toBe(300);
       // Arrays should show partial data when insufficient
-      expect(result.payload.specVersionHash).toEqual([0xAA, 0xBB, 0xCC, 0xDD]);
-      expect(result.payload.libraryVersionHash).toEqual([]);
+      expect(result.payload.spec_version_hash).toEqual([0xAA, 0xBB, 0xCC, 0xDD]);
+      expect(result.payload.library_version_hash).toEqual([]);
     });
   });
 

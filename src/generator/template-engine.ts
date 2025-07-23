@@ -416,14 +416,32 @@ abstract class DialectParser {
     const arrayLength = field.arrayLength || 1;
     
     if (isArray && arrayLength > 1) {
-      const values: (string | number | bigint | boolean)[] = [];
-      let totalBytes = 0;
-      
       // Strip array notation from type to avoid double processing
       let baseType = field.type;
       if (baseType.includes('[') && baseType.includes(']')) {
         baseType = baseType.substring(0, baseType.indexOf('['));
       }
+      
+      // Special handling for char arrays - return as string
+      if (baseType === 'char') {
+        const chars: string[] = [];
+        let totalBytes = 0;
+        
+        for (let i = 0; i < arrayLength; i++) {
+          if (offset + totalBytes >= view.byteLength) break;
+          const charCode = view.getUint8(offset + totalBytes);
+          if (charCode === 0) break; // Null terminator
+          chars.push(String.fromCharCode(charCode));
+          totalBytes += 1;
+        }
+        
+        // Return string value and total bytes for the array
+        return { value: chars.join(''), bytesRead: arrayLength }; // Always consume full array size
+      }
+      
+      // Handle other array types
+      const values: (string | number | bigint | boolean)[] = [];
+      let totalBytes = 0;
       
       for (let i = 0; i < arrayLength; i++) {
         if (offset + totalBytes >= view.byteLength) break;
@@ -526,15 +544,83 @@ abstract class DialectParser {
       throw new Error(\`Unknown message type: \${message.message_name}\`);
     }
 
-    const payload = this.serializePayload(message, messageDef.fields);
+    // Extract fields from either flat structure or payload structure
+    const messageFields = this.extractMessageFields(message, messageDef.fields);
+    
+    // Complete the message with all defined fields (including extension fields with defaults)
+    const completeMessage = this.completeMessageWithDefaults(messageFields, messageDef.fields);
+    
+    const payload = this.serializePayload(completeMessage, messageDef.fields);
     return this.createMAVLinkFrame(message, messageDef.id, payload);
+  }
+
+  // Extract message fields from payload structure (payload format required)
+  private extractMessageFields(
+    message: Record<string, unknown>, 
+    fieldDefinitions: FieldDefinition[]
+  ): Record<string, unknown> {
+    // Require payload structure
+    if (!message.payload || typeof message.payload !== 'object') {
+      throw new Error(\`Message must have a 'payload' object containing the message fields. Expected format: { message_name: '...', system_id: 1, component_id: 1, sequence: 0, payload: { ...fields } }\`);
+    }
+    
+    return message.payload as Record<string, unknown>;
+  }
+
+  // Helper method to complete message with all defined fields
+  private completeMessageWithDefaults(
+    message: Record<string, unknown>, 
+    fields: FieldDefinition[]
+  ): Record<string, unknown> {
+    const completeMessage = { ...message };
+    
+    for (const field of fields) {
+      if (completeMessage[field.name] === undefined) {
+        completeMessage[field.name] = this.getDefaultValueForField(field);
+      }
+    }
+    
+    return completeMessage;
+  }
+
+  // Get default value for a field based on its definition
+  private getDefaultValueForField(field: FieldDefinition): unknown {
+    const isArray = field.arrayLength !== undefined && field.arrayLength > 1;
+    
+    if (isArray) {
+      return [];
+    }
+
+    let baseType = field.type;
+    if (baseType.includes('[') && baseType.includes(']')) {
+      baseType = baseType.substring(0, baseType.indexOf('['));
+    }
+
+    switch (baseType) {
+      case 'uint8_t':
+      case 'int8_t':
+      case 'uint16_t':
+      case 'int16_t':
+      case 'uint32_t':
+      case 'int32_t':
+      case 'float':
+      case 'double':
+        return 0;
+      case 'uint64_t':
+      case 'int64_t':
+        return 0n;
+      case 'char':
+        return field.type.includes('[') ? '' : '\\0';
+      default:
+        return 0;
+    }
   }
 
   private serializePayload(message: Record<string, unknown>, fields: FieldDefinition[]): Uint8Array {
     // Calculate total payload size
     let totalSize = 0;
     for (const field of fields) {
-      totalSize += this.getFieldSize(field.type);
+      totalSize += this.getFieldSize(field);
     }
 
     const buffer = new ArrayBuffer(totalSize);
@@ -561,6 +647,18 @@ abstract class DialectParser {
         baseType = baseType.substring(0, baseType.indexOf('['));
       }
       
+      // Special handling for char arrays - treat string as char array
+      if (baseType === 'char' && typeof value === 'string') {
+        const str = value as string;
+        for (let i = 0; i < arrayLength; i++) {
+          const charCode = i < str.length ? str.charCodeAt(i) : 0;
+          view.setUint8(offset + totalBytes, charCode);
+          totalBytes += 1;
+        }
+        return totalBytes;
+      }
+      
+      // Handle other array types
       const arrayValue = Array.isArray(value) ? value : [value];
       for (let i = 0; i < arrayLength; i++) {
         const itemValue = i < arrayValue.length ? arrayValue[i] : this.getDefaultValueForType(baseType);
@@ -625,12 +723,31 @@ abstract class DialectParser {
     }
   }
 
-  private getFieldSize(type: string): number {
+  private getFieldSize(field: FieldDefinition | string): number {
+    if (typeof field === 'string') {
+      // Legacy support for type string
+      if (field.includes('[') && field.includes(']')) {
+        const baseType = field.substring(0, field.indexOf('['));
+        const arrayLength = parseInt(field.substring(field.indexOf('[') + 1, field.indexOf(']')));
+        return this.getSingleFieldSize(baseType) * arrayLength;
+      }
+      return this.getSingleFieldSize(field);
+    }
+    
+    // Handle FieldDefinition object
+    const type = field.type;
+    const arrayLength = field.arrayLength;
+    
+    if (arrayLength && arrayLength > 1) {
+      return this.getSingleFieldSize(type) * arrayLength;
+    }
+    
     if (type.includes('[') && type.includes(']')) {
       const baseType = type.substring(0, type.indexOf('['));
-      const arrayLength = parseInt(type.substring(type.indexOf('[') + 1, type.indexOf(']')));
-      return this.getSingleFieldSize(baseType) * arrayLength;
+      const parsedArrayLength = parseInt(type.substring(type.indexOf('[') + 1, type.indexOf(']')));
+      return this.getSingleFieldSize(baseType) * parsedArrayLength;
     }
+    
     return this.getSingleFieldSize(type);
   }
 
@@ -784,6 +901,30 @@ export class {{capitalize dialectName}}Serializer {
   // Serialize a message to MAVLink bytes
   serialize(message: Record<string, unknown> & { message_name: string }): Uint8Array {
     return this.parser.serializeMessage(message);
+  }
+
+  // Complete a message with all defined fields (including extension fields with defaults)
+  // This is useful to see what the serializer would send without actually serializing
+  // Requires payload structure format
+  completeMessage(message: Record<string, unknown> & { message_name: string }): Record<string, unknown> {
+    const messageDef = Array.from(this.parser['messageDefinitions'].values())
+      .find(def => def.name === message.message_name);
+    
+    if (!messageDef) {
+      throw new Error(\`Unknown message type: \${message.message_name}\`);
+    }
+
+    // Extract fields from payload structure (throws error if not payload format)
+    const messageFields = this.parser['extractMessageFields'](message, messageDef.fields);
+    
+    // Complete the message with defaults
+    const completedFields = this.parser['completeMessageWithDefaults'](messageFields, messageDef.fields);
+    
+    // Return in the payload structure format
+    return {
+      ...message,
+      payload: completedFields
+    };
   }
 
   // Get supported message names for this dialect
