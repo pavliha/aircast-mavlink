@@ -1,5 +1,5 @@
-import { CommonParser, CommonSerializer } from '../src/generated/dialects/common';
-import { MinimalParser } from '../src/generated/dialects/minimal';
+import { CommonParser, CommonSerializer } from '../../src/generated/dialects/common';
+import { MinimalParser } from '../../src/generated/dialects/minimal';
 
 describe('Edge Cases and Error Conditions', () => {
   describe('Invalid Input Handling', () => {

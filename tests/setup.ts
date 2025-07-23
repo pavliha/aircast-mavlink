@@ -6,6 +6,9 @@
   return this.toString();
 };
 
+// Import custom matchers
+import './helpers/matchers';
+
 // Extend expect matchers for BigInt
 expect.extend({
   toBeBigInt(received: any, expected: any) {

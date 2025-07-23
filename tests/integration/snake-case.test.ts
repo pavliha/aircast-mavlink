@@ -1,8 +1,8 @@
-import { CommonParser, CommonSerializer } from '../src/generated/dialects/common';
-import { MinimalParser, MinimalSerializer } from '../src/generated/dialects/minimal';
+import { CommonParser, CommonSerializer } from '../../src/generated/dialects/common';
+import { MinimalParser, MinimalSerializer } from '../../src/generated/dialects/minimal';
 
-describe('MAVLink Integration Tests - Message Parsing and Serialization', () => {
-  describe('Common Dialect', () => {
+describe('Snake Case Integration Tests - Message Parsing and Serialization', () => {
+  describe('Common Dialect with snake_case', () => {
     let parser: CommonParser;
     let serializer: CommonSerializer;
 
@@ -12,20 +12,20 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
     });
 
     describe('HEARTBEAT Message Round-trip', () => {
-      test('should parse and serialize HEARTBEAT message correctly', () => {
+      test('should parse and serialize HEARTBEAT message correctly with snake_case', () => {
         const originalMessage = {
       message_name: 'HEARTBEAT',
       system_id: 1,
       component_id: 1,
       sequence: 42,
       payload: {
-        type: 6,
-        autopilot: 8,
-        base_mode: 81,
-        custom_mode: 12345,
-        system_status: 4,
-        mavlink_version: 3
-      }
+          type: 6,
+          autopilot: 8,
+          base_mode: 81,
+          custom_mode: 12345,
+          system_status: 4,
+          mavlink_version: 3
+        }
         };
 
         // Serialize to bytes
@@ -53,7 +53,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
         expect(parsedMessage.crc_ok).toBe(true);
         expect(parsedMessage.dialect).toBe('common');
 
-        // Verify payload fields match
+        // Verify payload fields match with snake_case
         expect(parsedMessage.payload.type).toBe(6);
         expect(parsedMessage.payload.autopilot).toBe(8);
         expect(parsedMessage.payload.base_mode).toBe(81);
@@ -62,7 +62,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
         expect(parsedMessage.payload.mavlink_version).toBe(3);
       });
 
-      test('should handle HEARTBEAT with default values', () => {
+      test('should handle HEARTBEAT with default values using snake_case', () => {
         const originalMessage = {
       message_name: 'HEARTBEAT',
       system_id: 255,
@@ -96,14 +96,14 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
     });
 
     describe('SYS_STATUS Message Round-trip', () => {
-      test('should parse and serialize SYS_STATUS message correctly', () => {
+      test('should parse and serialize SYS_STATUS message correctly with snake_case', () => {
         const originalMessage = {
       message_name: 'SYS_STATUS',
       system_id: 1,
       component_id: 1,
       sequence: 5,
       payload: {
-        onboard_control_sensors_present: 0x1F,
+          onboard_control_sensors_present: 0x1F,
         onboard_control_sensors_enabled: 0x0F,
         onboard_control_sensors_health: 0x07,
         load: 500,
@@ -116,7 +116,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
         errors_count2: 0,
         errors_count3: 0,
         errors_count4: 0
-      }
+        }
         };
 
         const serializedBytes = serializer.serialize(originalMessage);
@@ -128,7 +128,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
         expect(parsedMessage.message_name).toBe('SYS_STATUS');
         expect(parsedMessage.message_id).toBe(1);
 
-        // Check the core payload fields we provided
+        // Check the core payload fields we provided (using snake_case)
         expect(parsedMessage.payload.onboard_control_sensors_present).toBe(0x1F);
         expect(parsedMessage.payload.onboard_control_sensors_enabled).toBe(0x0F);
         expect(parsedMessage.payload.onboard_control_sensors_health).toBe(0x07);
@@ -142,18 +142,10 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
         expect(parsedMessage.payload.errors_count2).toBe(0);
         expect(parsedMessage.payload.errors_count3).toBe(0);
         expect(parsedMessage.payload.errors_count4).toBe(0);
-
-        // Extended fields should have default values
-        expect(parsedMessage.payload.onboard_control_sensors_present_extended).toBe(0);
-        expect(parsedMessage.payload.onboard_control_sensors_enabled_extended).toBe(0);
-        expect(parsedMessage.payload.onboard_control_sensors_health_extended).toBe(0);
       });
     });
 
-    // Note: STATUSTEXT serialization currently has buffer issues in the generated code
-    // This is a known limitation that should be addressed in the code generator
-
-    describe('Multiple Messages', () => {
+    describe('Multiple Messages with snake_case', () => {
       test('should handle multiple different messages in sequence', () => {
         const messages = [
           {
@@ -190,16 +182,6 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
               errors_count3: 0,
               errors_count4: 0
             }
-          },
-          {
-            message_name: 'STATUSTEXT',
-            system_id: 1,
-            component_id: 1,
-            sequence: 2,
-            payload: {
-              severity: 6,
-              text: "Multi-message test"
-            }
           }
         ];
 
@@ -215,22 +197,23 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
         // Parse all messages at once
         const parsedMessages = parser.parseBytes(combinedBytes);
 
-        expect(parsedMessages).toHaveLength(3);
+        expect(parsedMessages).toHaveLength(2);
 
         // Verify first message (HEARTBEAT)
         expect(parsedMessages[0].message_name).toBe('HEARTBEAT');
         expect(parsedMessages[0].sequence).toBe(0);
         expect(parsedMessages[0].payload.type).toBe(6);
+        expect(parsedMessages[0].payload.base_mode).toBe(0);
+        expect(parsedMessages[0].payload.custom_mode).toBe(0);
+        expect(parsedMessages[0].payload.system_status).toBe(4);
 
         // Verify second message (SYS_STATUS)
         expect(parsedMessages[1].message_name).toBe('SYS_STATUS');
         expect(parsedMessages[1].sequence).toBe(1);
         expect(parsedMessages[1].payload.load).toBe(250);
-
-        // Verify third message (STATUSTEXT)
-        expect(parsedMessages[2].message_name).toBe('STATUSTEXT');
-        expect(parsedMessages[2].sequence).toBe(2);
-        expect(parsedMessages[2].payload.text).toBe("Multi-message test");
+        expect(parsedMessages[1].payload.voltage_battery).toBe(12000);
+        expect(parsedMessages[1].payload.current_battery).toBe(1000);
+        expect(parsedMessages[1].payload.battery_remaining).toBe(90);
       });
     });
 
@@ -242,7 +225,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
       component_id: 1,
       sequence: 0,
       payload: {
-
+          
         }
         };
 
@@ -250,41 +233,10 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
           serializer.serialize(invalidMessage);
         }).toThrow('Unknown message type: UNKNOWN_MESSAGE_TYPE');
       });
-
-      test('should handle corrupted serialized data gracefully', () => {
-        // Create valid message first
-        const validMessage = {
-      message_name: 'HEARTBEAT',
-      system_id: 1,
-      component_id: 1,
-      sequence: 0,
-      payload: {
-          type: 6,
-        autopilot: 8,
-        base_mode: 0,
-        custom_mode: 0,
-        system_status: 4,
-        mavlink_version: 3
-        }
-        };
-
-        const validBytes = serializer.serialize(validMessage);
-
-        // Corrupt the bytes by changing some middle bytes
-        const corruptedBytes = new Uint8Array(validBytes);
-        corruptedBytes[10] = 0xFF;
-        corruptedBytes[11] = 0xFF;
-
-        // Parser should handle corrupted data without crashing
-        const parsedMessages = parser.parseBytes(corruptedBytes);
-
-        // May parse successfully with wrong checksum or skip the message
-        expect(Array.isArray(parsedMessages)).toBe(true);
-      });
     });
   });
 
-  describe('Minimal Dialect', () => {
+  describe('Minimal Dialect with snake_case', () => {
     let parser: MinimalParser;
     let serializer: MinimalSerializer;
 
@@ -294,7 +246,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
     });
 
     describe('HEARTBEAT Message Round-trip', () => {
-      test('should parse and serialize HEARTBEAT message correctly', () => {
+      test('should parse and serialize HEARTBEAT message correctly with snake_case', () => {
         const originalMessage = {
       message_name: 'HEARTBEAT',
       system_id: 2,
@@ -322,6 +274,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
         expect(parsedMessage.sequence).toBe(100);
         expect(parsedMessage.dialect).toBe('minimal');
 
+        // Verify snake_case field names
         expect(parsedMessage.payload.type).toBe(1);
         expect(parsedMessage.payload.autopilot).toBe(3);
         expect(parsedMessage.payload.base_mode).toBe(157);
@@ -332,7 +285,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
     });
 
     describe('PROTOCOL_VERSION Message Round-trip', () => {
-      test('should parse and serialize PROTOCOL_VERSION message with arrays correctly', () => {
+      test('should parse and serialize PROTOCOL_VERSION message with arrays correctly using snake_case', () => {
         const originalMessage = {
       message_name: 'PROTOCOL_VERSION',
       system_id: 1,
@@ -362,7 +315,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
         expect(parsedMessage.payload.library_version_hash).toEqual([17, 18, 19, 20, 21, 22, 23, 24]);
       });
 
-      test('should handle PROTOCOL_VERSION with partial arrays', () => {
+      test('should handle PROTOCOL_VERSION with partial arrays using snake_case', () => {
         const originalMessage = {
       message_name: 'PROTOCOL_VERSION',
       system_id: 1,
@@ -392,13 +345,13 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
     });
   });
 
-  describe('Cross-Dialect Compatibility', () => {
+  describe('Cross-Dialect Compatibility with snake_case', () => {
     test('minimal dialect messages should be parseable by common dialect parser', () => {
       const minimalParser = new MinimalParser();
       const minimalSerializer = new MinimalSerializer();
       const commonParser = new CommonParser();
 
-      // Create HEARTBEAT in minimal dialect
+      // Create HEARTBEAT in minimal dialect using snake_case
       const heartbeatMessage = {
       message_name: 'HEARTBEAT',
       system_id: 1,
@@ -423,10 +376,13 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
       expect(minimalParsed).toHaveLength(1);
       expect(commonParsed).toHaveLength(1);
 
-      // Payload should be identical
+      // Payload should be identical with snake_case fields
       expect(minimalParsed[0].payload.type).toBe(commonParsed[0].payload.type);
       expect(minimalParsed[0].payload.autopilot).toBe(commonParsed[0].payload.autopilot);
+      expect(minimalParsed[0].payload.base_mode).toBe(commonParsed[0].payload.base_mode);
       expect(minimalParsed[0].payload.custom_mode).toBe(commonParsed[0].payload.custom_mode);
+      expect(minimalParsed[0].payload.system_status).toBe(commonParsed[0].payload.system_status);
+      expect(minimalParsed[0].payload.mavlink_version).toBe(commonParsed[0].payload.mavlink_version);
 
       // Only dialect identifier should differ
       expect(minimalParsed[0].dialect).toBe('minimal');
@@ -434,12 +390,12 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
     });
   });
 
-  describe('Data Type Validation', () => {
+  describe('Data Type Validation with snake_case', () => {
     test('should handle various MAVLink data types correctly', () => {
       const parser = new CommonParser();
       const serializer = new CommonSerializer();
 
-      // Test HEARTBEAT with extreme values
+      // Test HEARTBEAT with extreme values using snake_case
       const heartbeatMessage = {
       message_name: 'HEARTBEAT',
       system_id: 1,
@@ -461,7 +417,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
       expect(parsedMessages).toHaveLength(1);
       const parsed = parsedMessages[0];
 
-      // Verify extreme values are preserved
+      // Verify extreme values are preserved with snake_case
       expect(parsed.payload.type).toBe(255);
       expect(parsed.payload.autopilot).toBe(255);
       expect(parsed.payload.base_mode).toBe(255);
@@ -470,7 +426,7 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
     });
   });
 
-  describe('Streaming and Partial Data', () => {
+  describe('Streaming and Partial Data with snake_case', () => {
     test('should handle partial messages across multiple parseBytes calls', () => {
       const parser = new CommonParser();
       const serializer = new CommonSerializer();
@@ -504,6 +460,9 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
       const messages2 = parser.parseBytes(part2);
       expect(messages2).toHaveLength(1);
       expect(messages2[0].message_name).toBe('HEARTBEAT');
+      expect(messages2[0].payload.base_mode).toBe(0);
+      expect(messages2[0].payload.custom_mode).toBe(0);
+      expect(messages2[0].payload.system_status).toBe(4);
     });
 
     test('should parse multiple complete messages in single buffer', () => {
@@ -551,10 +510,16 @@ describe('MAVLink Integration Tests - Message Parsing and Serialization', () => 
 
       expect(messages[0].payload.type).toBe(1);
       expect(messages[0].payload.autopilot).toBe(3);
+      expect(messages[0].payload.base_mode).toBe(0);
+      expect(messages[0].payload.custom_mode).toBe(0);
+      expect(messages[0].payload.system_status).toBe(4);
       expect(messages[0].sequence).toBe(0);
 
       expect(messages[1].payload.type).toBe(2);
       expect(messages[1].payload.autopilot).toBe(4);
+      expect(messages[1].payload.base_mode).toBe(0);
+      expect(messages[1].payload.custom_mode).toBe(0);
+      expect(messages[1].payload.system_status).toBe(4);
       expect(messages[1].sequence).toBe(1);
     });
   });

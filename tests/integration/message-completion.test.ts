@@ -1,7 +1,7 @@
 import {
   CommonParser,
   CommonSerializer
-} from '../src/generated/dialects/common';
+} from '../../src/generated/dialects/common';
 
 describe('Message Completion Feature', () => {
   let parser: CommonParser;

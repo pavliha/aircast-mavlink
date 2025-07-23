@@ -1,4 +1,4 @@
-import { MinimalParser } from '../src/generated/dialects/minimal/decoder';
+import { MinimalParser } from '../../src/generated/dialects/minimal/decoder';
 
 describe('Generated Decoder Tests', () => {
   let parser: MinimalParser;

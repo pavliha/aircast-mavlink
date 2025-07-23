@@ -11,7 +11,7 @@ jest.mock('node-fetch', () => jest.fn());
 const execAsync = promisify(exec);
 
 describe('CLI Tests', () => {
-  const cliPath = path.join(__dirname, '../src/cli.ts');
+  const cliPath = path.join(__dirname, '../../src/cli.ts');
   const testOutputDir = path.join(__dirname, '../test-output');
   
   beforeEach(async () => {

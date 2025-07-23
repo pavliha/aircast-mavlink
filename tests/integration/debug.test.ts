@@ -1,4 +1,4 @@
-import { ArdupilotmegaParser, ArdupilotmegaSerializer } from '../src/generated/dialects/ardupilotmega';
+import { ArdupilotmegaParser, ArdupilotmegaSerializer } from '../../src/generated/dialects/ardupilotmega';
 
 describe('Debug Tests', () => {
   test('MEMINFO debug', () => {
@@ -10,9 +10,11 @@ describe('Debug Tests', () => {
       system_id: 1,
       component_id: 1,
       sequence: 0,
-      brkval: 65536,
-      freemem: 32768,
-      freemem32: 1048576
+      payload: {
+        brkval: 65536,
+        freemem: 32768,
+        freemem32: 1048576
+      }
     };
 
     console.log('Original message:', message);

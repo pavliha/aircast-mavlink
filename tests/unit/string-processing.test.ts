@@ -1,4 +1,4 @@
-import { CommonParser, CommonSerializer } from '../src/generated/dialects/common';
+import { CommonParser, CommonSerializer } from '../../src/generated/dialects/common';
 
 describe('String Serialization Tests', () => {
   let parser: CommonParser;
