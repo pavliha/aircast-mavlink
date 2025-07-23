@@ -851,7 +851,30 @@ export class {{capitalize dialectName}}Serializer {
     if (!template) {
       throw new Error('Messages template not found');
     }
-    return template({ ...dialect, includeEnums });
+    
+    // Filter enums to only include those actually used in message fields
+    const usedEnums = this.getUsedEnums(dialect);
+    
+    return template({ ...dialect, includeEnums, enums: usedEnums });
+  }
+
+  private getUsedEnums(dialect: TypeScriptDialect): any[] {
+    // Collect all field types used in messages
+    const usedTypes = new Set<string>();
+    
+    for (const message of dialect.messages) {
+      for (const field of message.fields) {
+        // Extract base type from array notation (e.g., "ESC_FAILURE_FLAGS[]" -> "ESC_FAILURE_FLAGS")
+        let baseType = field.type;
+        if (baseType.endsWith('[]')) {
+          baseType = baseType.slice(0, -2);
+        }
+        usedTypes.add(baseType);
+      }
+    }
+    
+    // Filter enums to only include those referenced in fields
+    return dialect.enums.filter(enumDef => usedTypes.has(enumDef.name));
   }
 
   generateIndex(dialect: TypeScriptDialect, includeEnums: boolean = false): string {
