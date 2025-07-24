@@ -63,6 +63,7 @@ export interface TypeScriptMessage {
   originalName: string;
   description: string[];
   fields: TypeScriptField[];
+  crcExtra: number;
 }
 
 export interface TypeScriptDialect {

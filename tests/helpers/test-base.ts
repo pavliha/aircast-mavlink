@@ -2,6 +2,8 @@
  * Base test classes and utilities for MAVLink testing
  */
 
+export { testMessages } from '../fixtures/messages';
+
 export interface MAVLinkParsedMessage {
   timestamp?: number;
   system_id: number;

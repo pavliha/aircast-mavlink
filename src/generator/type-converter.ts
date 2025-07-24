@@ -8,6 +8,7 @@ import {
   TypeScriptMessage,
   TypeScriptField
 } from '../types';
+import { CRC_EXTRA } from './mavlink-crc';
 
 export class TypeConverter {
   private static readonly MAVLINK_TO_TS_TYPES: Record<string, string> = {
@@ -108,7 +109,8 @@ export class TypeConverter {
       name: this.convertMessageName(messageDef.name),
       originalName: messageDef.name,
       description: this.parseDescription(messageDef.description || ''),
-      fields: []
+      fields: [],
+      crcExtra: CRC_EXTRA[messageDef.id] || 0
     };
 
     // Use fields in their original XML order for correct MAVLink serialization

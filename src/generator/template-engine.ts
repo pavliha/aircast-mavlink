@@ -1,5 +1,6 @@
 import Handlebars from 'handlebars';
-import { TypeScriptDialect } from '../types';
+import { TypeScriptDialect, TypeScriptEnum } from '../types';
+import { MAVLinkCRC, CRC_EXTRA } from './mavlink-crc';
 
 export class TemplateEngine {
   private templates: Map<string, HandlebarsTemplateDelegate> = new Map();
@@ -149,6 +150,39 @@ export * from './decoder';
     // Combined decoder and parser template
     this.templates.set('decoder', Handlebars.compile(`// Auto-generated decoder and parser for {{{ dialectName }}} dialect
 // Generated from MAVLink XML definitions
+
+// Embedded MAVLink CRC implementation
+{{{generateCrcExtra messages}}}
+
+class MAVLinkCRC {
+  static calculate(data: Uint8Array, crcExtra: number): number {
+    let crc = 0xffff;
+
+    // Process all message bytes using MCRF4XX algorithm
+    for (let i = 0; i < data.length; i++) {
+      let tmp = data[i] ^ (crc & 0xff);
+      tmp = (tmp ^ (tmp << 4)) & 0xff;
+      crc = ((crc >> 8) ^ (tmp << 8) ^ (tmp << 3) ^ (tmp >> 4)) & 0xffff;
+    }
+
+    // Add CRC_EXTRA byte using the same algorithm
+    let tmp = crcExtra ^ (crc & 0xff);
+    tmp = (tmp ^ (tmp << 4)) & 0xff;
+    crc = ((crc >> 8) ^ (tmp << 8) ^ (tmp << 3) ^ (tmp >> 4)) & 0xffff;
+
+    return crc;
+  }
+  
+  static validate(data: Uint8Array, messageId: number, receivedChecksum: number): boolean {
+    const crcExtra = CRC_EXTRA[messageId];
+    if (crcExtra === undefined) {
+      return false;
+    }
+    
+    const calculatedChecksum = this.calculate(data, crcExtra);
+    return calculatedChecksum === receivedChecksum;
+  }
+}
 
 // Parser types for MAVLink protocol parsing
 interface ParsedMAVLinkMessage {
@@ -311,7 +345,9 @@ abstract class DialectParser {
       }
     }
 
-    frame.crc_ok = true; // Simplified - not doing CRC validation
+    // Validate CRC using proper MAVLink algorithm
+    const headerAndPayload = data.slice(offset + 1, offset + frameOffset - offset - 2);
+    frame.crc_ok = MAVLinkCRC.validate(headerAndPayload, frame.message_id, frame.checksum);
     frame.protocol_version = isV2 ? 2 : 1;
 
     return { frame: frame as MAVLinkFrame, bytesConsumed: frameOffset - offset };
@@ -466,7 +502,7 @@ abstract class DialectParser {
         case 'int8_t':
           return { value: view.getInt8(offset), bytesRead: 1 };
         case 'uint16_t':
-          return { value: view.getUint16(offset, true), bytesRead: 2 };
+          return { value: view.getUint16(offset, false), bytesRead: 2 };
         case 'int16_t':
           return { value: view.getInt16(offset, true), bytesRead: 2 };
         case 'uint32_t':
@@ -682,7 +718,7 @@ abstract class DialectParser {
         view.setInt8(offset, Number(actualValue));
         return 1;
       case 'uint16_t':
-        view.setUint16(offset, Number(actualValue), true);
+        view.setUint16(offset, Number(actualValue), false);
         return 2;
       case 'int16_t':
         view.setInt16(offset, Number(actualValue), true);
@@ -795,13 +831,15 @@ abstract class DialectParser {
   }
 
   private createMAVLinkFrame(message: Record<string, unknown>, messageId: number, payload: Uint8Array): Uint8Array {
-    const magic = 0xFD; // Use MAVLink v2
     const systemId = typeof message.system_id === 'number' ? message.system_id : 1;
     const componentId = typeof message.component_id === 'number' ? message.component_id : 1;
     const sequence = typeof message.sequence === 'number' ? message.sequence : 0;
     
-    // MAVLink v2 header: magic(1) + len(1) + incompat_flags(1) + compat_flags(1) + seq(1) + sysid(1) + compid(1) + msgid(3) + payload + checksum(2)
-    const headerSize = 10;
+    // Use MAVLink v1 for SITL compatibility
+    const magic = 0xFE; // MAVLink v1
+    
+    // MAVLink v1 header: magic(1) + len(1) + seq(1) + sysid(1) + compid(1) + msgid(1) + payload + checksum(2)
+    const headerSize = 6;
     const frameSize = headerSize + payload.length + 2;
     const buffer = new ArrayBuffer(frameSize);
     const view = new DataView(buffer);
@@ -811,28 +849,25 @@ abstract class DialectParser {
     // Header
     view.setUint8(offset++, magic);
     view.setUint8(offset++, payload.length);
-    view.setUint8(offset++, 0); // incompat_flags
-    view.setUint8(offset++, 0); // compat_flags
     view.setUint8(offset++, sequence);
     view.setUint8(offset++, systemId);
     view.setUint8(offset++, componentId);
-    
-    // 24-bit message ID (little endian)
-    view.setUint8(offset++, messageId & 0xFF);
-    view.setUint8(offset++, (messageId >> 8) & 0xFF);
-    view.setUint8(offset++, (messageId >> 16) & 0xFF);
+    view.setUint8(offset++, messageId & 0xFF); // 8-bit message ID in v1
     
     // Payload
     const payloadView = new Uint8Array(buffer, offset, payload.length);
     payloadView.set(payload);
     offset += payload.length;
     
-    // Calculate checksum (simplified - using sum of all bytes)
-    let checksum = 0;
-    for (let i = 1; i < offset; i++) {
-      checksum += view.getUint8(i);
+    // Calculate proper MAVLink CRC with CRC_EXTRA
+    const crcExtra = CRC_EXTRA[messageId];
+    if (crcExtra === undefined) {
+      throw new Error("No CRC_EXTRA defined for message ID " + messageId);
     }
-    checksum &= 0xFFFF;
+    
+    // Get message data (exclude start byte and checksum)
+    const messageData = new Uint8Array(buffer, 1, offset - 1);
+    const checksum = MAVLinkCRC.calculate(messageData, crcExtra);
     
     // Checksum (little endian)
     view.setUint8(offset++, checksum & 0xFF);
@@ -962,6 +997,11 @@ export class {{capitalize dialectName}}Serializer {
       return str.charAt(0).toUpperCase() + str.slice(1);
     });
 
+    Handlebars.registerHelper('generateCrcExtra', (messages: any[]) => {
+      const entries = messages.map(msg => `  ${msg.id}: ${msg.crcExtra}`).join(',\n');
+      return `const CRC_EXTRA: Record<number, number> = {\n${entries}\n};`;
+    });
+
     Handlebars.registerHelper('generateTypes', (dialect: TypeScriptDialect) => {
       return this.generateTypes(dialect, false);
     });
@@ -992,17 +1032,17 @@ export class {{capitalize dialectName}}Serializer {
     if (!template) {
       throw new Error('Messages template not found');
     }
-    
+
     // Filter enums to only include those actually used in message fields
     const usedEnums = this.getUsedEnums(dialect);
-    
+
     return template({ ...dialect, includeEnums, enums: usedEnums });
   }
 
-  private getUsedEnums(dialect: TypeScriptDialect): any[] {
+  private getUsedEnums(dialect: TypeScriptDialect): TypeScriptEnum[] {
     // Collect all field types used in messages
     const usedTypes = new Set<string>();
-    
+
     for (const message of dialect.messages) {
       for (const field of message.fields) {
         // Extract base type from array notation (e.g., "ESC_FAILURE_FLAGS[]" -> "ESC_FAILURE_FLAGS")
@@ -1013,7 +1053,7 @@ export class {{capitalize dialectName}}Serializer {
         usedTypes.add(baseType);
       }
     }
-    
+
     // Filter enums to only include those referenced in fields
     return dialect.enums.filter(enumDef => usedTypes.has(enumDef.name));
   }

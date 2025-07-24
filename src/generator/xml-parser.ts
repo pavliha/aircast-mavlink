@@ -1,6 +1,7 @@
 import { parseString } from 'xml2js';
 import fetch from 'node-fetch';
 import { promises as fs } from 'fs';
+import path from 'path';
 import { MAVLinkDialectDefinition, EnumDefinition, MessageDefinition, FieldDefinition, MAVLinkDialect, XMLEnum, XMLMessage } from '../types';
 
 export class XMLParser {
@@ -122,7 +123,6 @@ export class XMLParser {
     }
 
     // Otherwise, resolve relative to the directory of the source file
-    const path = require('path');
     return path.resolve(path.dirname(source), include);
   }
 

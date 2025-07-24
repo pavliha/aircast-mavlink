@@ -65,6 +65,7 @@
     "dev": "tsx src/cli.ts",
     "test": "jest",
     "test:coverage": "jest --coverage --collectCoverageFrom=\"src/**/*.ts\" --collectCoverageFrom=\"!src/generated/**/*\"",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist src/generated",
     "gen:common": "tsx src/cli.ts generate -i https://raw.githubusercontent.com/mavlink/mavlink/master/message_definitions/v1.0/common.xml -o ./src/generated/dialects/common",
