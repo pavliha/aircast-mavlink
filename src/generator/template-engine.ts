@@ -1,18 +1,19 @@
-import Handlebars from 'handlebars';
-import { TypeScriptDialect, TypeScriptEnum } from '../types';
-import { MAVLinkCRC, CRC_EXTRA } from './mavlink-crc';
+import Handlebars from 'handlebars'
+import { TypeScriptDialect, TypeScriptEnum } from '../types'
 
 export class TemplateEngine {
-  private templates: Map<string, HandlebarsTemplateDelegate> = new Map();
+  private templates: Map<string, HandlebarsTemplateDelegate> = new Map()
 
   constructor() {
-    this.initializeTemplates();
-    this.registerHelpers();
+    this.initializeTemplates()
+    this.registerHelpers()
   }
 
   private initializeTemplates(): void {
     // Main types template
-    this.templates.set('types', Handlebars.compile(`// Auto-generated TypeScript types for {{ dialectName }} dialect
+    this.templates.set(
+      'types',
+      Handlebars.compile(`// Auto-generated TypeScript types for {{ dialectName }} dialect
 // Generated from MAVLink XML definitions
 
 export interface ParsedMAVLinkMessage {
@@ -44,10 +45,13 @@ export type {{ name }} =
 
 {{/each}}
 {{/unless}}
-`));
+`)
+    )
 
     // Enums template
-    this.templates.set('enums', Handlebars.compile(`// Auto-generated TypeScript enums for {{ dialectName }} dialect
+    this.templates.set(
+      'enums',
+      Handlebars.compile(`// Auto-generated TypeScript enums for {{ dialectName }} dialect
 
 {{#each enums}}
 {{#each description}}
@@ -70,10 +74,13 @@ export type {{ name }} = {{ name }}Enum;
 // This dialect has no enums defined
 export {};
 {{/unless}}
-`));
+`)
+    )
 
     // Messages template
-    this.templates.set('messages', Handlebars.compile(`// Auto-generated TypeScript message interfaces for {{ dialectName }} dialect
+    this.templates.set(
+      'messages',
+      Handlebars.compile(`// Auto-generated TypeScript message interfaces for {{ dialectName }} dialect
 
 import { ParsedMAVLinkMessage } from './types';
 {{#if includeEnums}}
@@ -125,10 +132,13 @@ export function is{{ name }}(msg: ParsedMAVLinkMessage): msg is ParsedMAVLinkMes
   return msg.message_name === '{{ originalName }}';
 }
 {{/each}}
-`));
+`)
+    )
 
     // Index template
-    this.templates.set('index', Handlebars.compile(`// Auto-generated TypeScript index file
+    this.templates.set(
+      'index',
+      Handlebars.compile(`// Auto-generated TypeScript index file
 // Exports all dialect types
 
 export * from './types';
@@ -139,16 +149,22 @@ export * from './enums';
 {{/if}}
 export * from './messages';
 export * from './decoder';
-`));
+`)
+    )
 
     // Single file template
-    this.templates.set('single', Handlebars.compile(`{{{ generateTypes this }}}
+    this.templates.set(
+      'single',
+      Handlebars.compile(`{{{ generateTypes this }}}
 
 {{{ generateMessages this }}}
-`));
+`)
+    )
 
     // Combined decoder and parser template
-    this.templates.set('decoder', Handlebars.compile(`// Auto-generated decoder and parser for {{{ dialectName }}} dialect
+    this.templates.set(
+      'decoder',
+      Handlebars.compile(`// Auto-generated decoder and parser for {{{ dialectName }}} dialect
 // Generated from MAVLink XML definitions
 
 // Embedded MAVLink CRC implementation
@@ -1066,120 +1082,121 @@ export class {{capitalize dialectName}}Serializer {
     return Array.from(this.parser['messageDefinitions'].values()).some(def => def.name === messageName);
   }
 }
-`));
-
+`)
+    )
   }
 
   private registerHelpers(): void {
     Handlebars.registerHelper('join', (array: string[], separator: string) => {
-      return array.join(separator);
-    });
+      return array.join(separator)
+    })
 
     Handlebars.registerHelper('eq', (a: unknown, b: unknown) => {
-      return a === b;
-    });
+      return a === b
+    })
 
     Handlebars.registerHelper('ne', (a: unknown, b: unknown) => {
-      return a !== b;
-    });
+      return a !== b
+    })
 
     Handlebars.registerHelper('toUpperCase', (str: string) => {
-      return str.toUpperCase();
-    });
+      return str.toUpperCase()
+    })
 
     Handlebars.registerHelper('capitalize', (str: string) => {
-      return str.charAt(0).toUpperCase() + str.slice(1);
-    });
+      return str.charAt(0).toUpperCase() + str.slice(1)
+    })
 
-    Handlebars.registerHelper('generateCrcExtra', (messages: any[]) => {
-      const entries = messages.map(msg => `  ${msg.id}: ${msg.crcExtra}`).join(',\n');
-      return `const CRC_EXTRA: Record<number, number> = {\n${entries}\n};`;
-    });
+    Handlebars.registerHelper(
+      'generateCrcExtra',
+      (messages: Array<{ id: number; crcExtra: number }>) => {
+        const entries = messages.map((msg) => `  ${msg.id}: ${msg.crcExtra}`).join(',\n')
+        return `const CRC_EXTRA: Record<number, number> = {\n${entries}\n};`
+      }
+    )
 
     Handlebars.registerHelper('generateTypes', (dialect: TypeScriptDialect) => {
-      return this.generateTypes(dialect, false);
-    });
+      return this.generateTypes(dialect, false)
+    })
 
     Handlebars.registerHelper('generateMessages', (dialect: TypeScriptDialect) => {
-      return this.generateMessages(dialect, false);
-    });
+      return this.generateMessages(dialect, false)
+    })
   }
 
   generateTypes(dialect: TypeScriptDialect, includeEnums: boolean = true): string {
-    const template = this.templates.get('types');
+    const template = this.templates.get('types')
     if (!template) {
-      throw new Error('Types template not found');
+      throw new Error('Types template not found')
     }
-    return template({ ...dialect, includeEnums });
+    return template({ ...dialect, includeEnums })
   }
 
   generateEnums(dialect: TypeScriptDialect): string {
-    const template = this.templates.get('enums');
+    const template = this.templates.get('enums')
     if (!template) {
-      throw new Error('Enums template not found');
+      throw new Error('Enums template not found')
     }
-    return template(dialect);
+    return template(dialect)
   }
 
   generateMessages(dialect: TypeScriptDialect, includeEnums: boolean = false): string {
-    const template = this.templates.get('messages');
+    const template = this.templates.get('messages')
     if (!template) {
-      throw new Error('Messages template not found');
+      throw new Error('Messages template not found')
     }
 
     // Filter enums to only include those actually used in message fields
-    const usedEnums = this.getUsedEnums(dialect);
+    const usedEnums = this.getUsedEnums(dialect)
 
-    return template({ ...dialect, includeEnums, enums: usedEnums });
+    return template({ ...dialect, includeEnums, enums: usedEnums })
   }
 
   private getUsedEnums(dialect: TypeScriptDialect): TypeScriptEnum[] {
     // Collect all field types used in messages
-    const usedTypes = new Set<string>();
+    const usedTypes = new Set<string>()
 
     for (const message of dialect.messages) {
       for (const field of message.fields) {
         // Extract base type from array notation (e.g., "ESC_FAILURE_FLAGS[]" -> "ESC_FAILURE_FLAGS")
-        let baseType = field.type;
+        let baseType = field.type
         if (baseType.endsWith('[]')) {
-          baseType = baseType.slice(0, -2);
+          baseType = baseType.slice(0, -2)
         }
-        usedTypes.add(baseType);
+        usedTypes.add(baseType)
       }
     }
 
     // Filter enums to only include those referenced in fields
-    return dialect.enums.filter(enumDef => usedTypes.has(enumDef.name));
+    return dialect.enums.filter((enumDef) => usedTypes.has(enumDef.name))
   }
 
   generateIndex(dialect: TypeScriptDialect, includeEnums: boolean = false): string {
-    const template = this.templates.get('index');
+    const template = this.templates.get('index')
     if (!template) {
-      throw new Error('Index template not found');
+      throw new Error('Index template not found')
     }
-    return template({ ...dialect, includeEnums });
+    return template({ ...dialect, includeEnums })
   }
 
   generateSingle(dialect: TypeScriptDialect): string {
-    const template = this.templates.get('single');
+    const template = this.templates.get('single')
     if (!template) {
-      throw new Error('Single template not found');
+      throw new Error('Single template not found')
     }
     const context = {
       ...dialect,
       generateTypes: () => this.generateTypes(dialect, false),
-      generateMessages: () => this.generateMessages(dialect, false)
-    };
-    return template(context);
+      generateMessages: () => this.generateMessages(dialect, false),
+    }
+    return template(context)
   }
 
   generateDecoder(dialect: TypeScriptDialect): string {
-    const template = this.templates.get('decoder');
+    const template = this.templates.get('decoder')
     if (!template) {
-      throw new Error('Decoder template not found');
+      throw new Error('Decoder template not found')
     }
-    return template(dialect);
+    return template(dialect)
   }
-
-
 }

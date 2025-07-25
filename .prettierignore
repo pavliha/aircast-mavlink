@@ -1,0 +1,6 @@
+dist
+src/generated
+coverage
+node_modules
+*.log
+.git

@@ -1,42 +1,50 @@
-import { parseString } from 'xml2js';
-import fetch from 'node-fetch';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { MAVLinkDialectDefinition, EnumDefinition, MessageDefinition, FieldDefinition, MAVLinkDialect, XMLEnum, XMLMessage } from '../types';
+import { parseString } from 'xml2js'
+import fetch from 'node-fetch'
+import { promises as fs } from 'fs'
+import path from 'path'
+import {
+  MAVLinkDialectDefinition,
+  EnumDefinition,
+  MessageDefinition,
+  FieldDefinition,
+  MAVLinkDialect,
+  XMLEnum,
+  XMLMessage,
+} from '../types'
 
 export class XMLParser {
-  private processedUrls = new Set<string>();
+  private processedUrls = new Set<string>()
 
   async parseFromURL(url: string): Promise<MAVLinkDialectDefinition> {
-    const response = await fetch(url);
+    const response = await fetch(url)
     if (!response.ok) {
-      throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
+      throw new Error(`Failed to fetch ${url}: ${response.statusText}`)
     }
-    const xmlContent = await response.text();
-    return this.parseXML(xmlContent, url);
+    const xmlContent = await response.text()
+    return this.parseXML(xmlContent, url)
   }
 
   async parseFromFile(filePath: string): Promise<MAVLinkDialectDefinition> {
-    const xmlContent = await fs.readFile(filePath, 'utf-8');
-    return this.parseXML(xmlContent, filePath);
+    const xmlContent = await fs.readFile(filePath, 'utf-8')
+    return this.parseXML(xmlContent, filePath)
   }
 
   private async parseXML(xmlContent: string, source: string): Promise<MAVLinkDialectDefinition> {
     return new Promise((resolve, reject) => {
       parseString(xmlContent, { explicitArray: false }, async (err, result) => {
         if (err) {
-          reject(new Error(`Failed to parse XML from ${source}: ${err.message}`));
-          return;
+          reject(new Error(`Failed to parse XML from ${source}: ${err.message}`))
+          return
         }
 
         try {
-          const definition = await this.processDefinition(result.mavlink, source);
-          resolve(definition);
+          const definition = await this.processDefinition(result.mavlink, source)
+          resolve(definition)
         } catch (error) {
-          reject(error);
+          reject(error)
         }
-      });
-    });
+      })
+    })
   }
 
   private async processDefinition(
@@ -50,36 +58,38 @@ export class XMLParser {
         dialect: undefined,
         includes: [],
         enums: [],
-        messages: []
-      };
+        messages: [],
+      }
     }
-    
+
     const definition: MAVLinkDialectDefinition = {
       version: mavlinkData.version,
       dialect: mavlinkData.dialect ? parseInt(mavlinkData.dialect) : undefined,
       includes: [],
       enums: [],
-      messages: []
-    };
+      messages: [],
+    }
 
     // Process includes
     if (mavlinkData.include) {
-      const includes = Array.isArray(mavlinkData.include) ? mavlinkData.include : [mavlinkData.include];
+      const includes = Array.isArray(mavlinkData.include)
+        ? mavlinkData.include
+        : [mavlinkData.include]
       for (const include of includes) {
-        const includeUrl = this.resolveIncludeUrl(include, source);
+        const includeUrl = this.resolveIncludeUrl(include, source)
         if (!this.processedUrls.has(includeUrl)) {
-          this.processedUrls.add(includeUrl);
+          this.processedUrls.add(includeUrl)
           try {
-            const includedDefinition = await this.parseFromURL(includeUrl);
+            const includedDefinition = await this.parseFromURL(includeUrl)
             // Merge included definitions
             if (includedDefinition.enums) {
-              definition.enums!.push(...includedDefinition.enums);
+              definition.enums!.push(...includedDefinition.enums)
             }
             if (includedDefinition.messages) {
-              definition.messages!.push(...includedDefinition.messages);
+              definition.messages!.push(...includedDefinition.messages)
             }
           } catch (error) {
-            console.warn(`Warning: Failed to process include ${includeUrl}:`, error);
+            console.warn(`Warning: Failed to process include ${includeUrl}:`, error)
           }
         }
       }
@@ -87,99 +97,103 @@ export class XMLParser {
 
     // Process enums
     if (mavlinkData.enums && mavlinkData.enums.enum) {
-      const enums = Array.isArray(mavlinkData.enums.enum) ? mavlinkData.enums.enum : [mavlinkData.enums.enum];
+      const enums = Array.isArray(mavlinkData.enums.enum)
+        ? mavlinkData.enums.enum
+        : [mavlinkData.enums.enum]
       for (const enumData of enums) {
-        const enumDef = this.processEnum(enumData);
+        const enumDef = this.processEnum(enumData)
         if (enumDef) {
-          definition.enums!.push(enumDef);
+          definition.enums!.push(enumDef)
         }
       }
     }
 
     // Process messages
     if (mavlinkData.messages && mavlinkData.messages.message) {
-      const messages = Array.isArray(mavlinkData.messages.message) ? mavlinkData.messages.message : [mavlinkData.messages.message];
+      const messages = Array.isArray(mavlinkData.messages.message)
+        ? mavlinkData.messages.message
+        : [mavlinkData.messages.message]
       for (const messageData of messages) {
-        const messageDef = this.processMessage(messageData);
+        const messageDef = this.processMessage(messageData)
         if (messageDef) {
-          definition.messages!.push(messageDef);
+          definition.messages!.push(messageDef)
         }
       }
     }
 
-    return definition;
+    return definition
   }
 
   private resolveIncludeUrl(include: string, source: string): string {
     if (include.startsWith('http')) {
-      return include;
+      return include
     }
 
     // If source is a URL, resolve relative to it
     if (source.startsWith('http')) {
-      const url = new URL(source);
-      url.pathname = url.pathname.replace(/[^/]*$/, include);
-      return url.toString();
+      const url = new URL(source)
+      url.pathname = url.pathname.replace(/[^/]*$/, include)
+      return url.toString()
     }
 
     // Otherwise, resolve relative to the directory of the source file
-    return path.resolve(path.dirname(source), include);
+    return path.resolve(path.dirname(source), include)
   }
 
   private processEnum(enumData: XMLEnum): EnumDefinition | null {
     if (!enumData.$ || !enumData.$.name) {
-      return null;
+      return null
     }
 
     const enumDef: EnumDefinition = {
       name: enumData.$.name,
       description: enumData.description || '',
       bitmask: enumData.$.bitmask === 'true',
-      entries: []
-    };
+      entries: [],
+    }
 
     if (enumData.entry) {
-      const entries = Array.isArray(enumData.entry) ? enumData.entry : [enumData.entry];
+      const entries = Array.isArray(enumData.entry) ? enumData.entry : [enumData.entry]
       for (const entry of entries) {
         if (entry.$ && entry.$.name && entry.$.value !== undefined) {
           enumDef.entries.push({
             name: entry.$.name,
             value: entry.$.value,
-            description: entry.description || entry._ || ''
-          });
+            description: entry.description || entry._ || '',
+          })
         }
       }
     }
 
-    return enumDef;
+    return enumDef
   }
 
   private processMessage(messageData: XMLMessage): MessageDefinition | null {
     if (!messageData.$ || !messageData.$.name || !messageData.$.id) {
-      return null;
+      return null
     }
 
     const messageDef: MessageDefinition = {
       id: parseInt(messageData.$.id),
       name: messageData.$.name,
       description: messageData.description || '',
-      fields: []
-    };
+      fields: [],
+    }
 
     if (messageData.field) {
-      const fields = Array.isArray(messageData.field) ? messageData.field : [messageData.field];
-      let inExtensions = false;
-      let extensionMarkerFound = false;
+      const fields = Array.isArray(messageData.field) ? messageData.field : [messageData.field]
+      let inExtensions = false
+      let extensionMarkerFound = false
 
       for (const field of fields) {
         // Check if this field is the extensions marker
         if (typeof field === 'object' && field && field.$ && field.$.name === 'extensions') {
           // This is the extensions marker - set flag and skip adding as a field
-          inExtensions = true;
-          extensionMarkerFound = true;
-          continue;
+          inExtensions = true
+          extensionMarkerFound = true
+          continue
         }
-        
+
         // XMLField should always be an object with $ property
         if (typeof field === 'object' && field && field.$ && field.$.name && field.$.type) {
           const fieldDef: FieldDefinition = {
@@ -187,9 +201,9 @@ export class XMLParser {
             type: field.$.type,
             enum: field.$.enum,
             description: field.description || field._ || '',
-            extension: inExtensions
-          };
-          messageDef.fields.push(fieldDef);
+            extension: inExtensions,
+          }
+          messageDef.fields.push(fieldDef)
         }
       }
 
@@ -199,42 +213,42 @@ export class XMLParser {
         // For legacy XML format without explicit extensions field marker,
         // we need to use a heuristic based on MAVLink v1 payload limit
         // This is a fallback for older message definitions
-        let corePayloadSize = 0;
-        const maxV1PayloadSize = 255; // MAVLink v1 maximum payload size
-        
+        let corePayloadSize = 0
+        const maxV1PayloadSize = 255 // MAVLink v1 maximum payload size
+
         for (let i = 0; i < messageDef.fields.length; i++) {
-          const field = messageDef.fields[i];
-          const fieldSize = this.getFieldSize(field.type);
-          
+          const field = messageDef.fields[i]
+          const fieldSize = this.getFieldSize(field.type)
+
           // If adding this field would exceed v1 limit, mark it and all following as extensions
           if (corePayloadSize + fieldSize > maxV1PayloadSize) {
             for (let j = i; j < messageDef.fields.length; j++) {
-              messageDef.fields[j].extension = true;
+              messageDef.fields[j].extension = true
             }
-            break;
+            break
           }
-          
-          corePayloadSize += fieldSize;
+
+          corePayloadSize += fieldSize
         }
       }
     }
 
-    return messageDef;
+    return messageDef
   }
 
   reset(): void {
-    this.processedUrls.clear();
+    this.processedUrls.clear()
   }
 
   private getFieldSize(type: string): number {
     // Handle array types
     if (type.includes('[') && type.includes(']')) {
-      const baseType = type.substring(0, type.indexOf('['));
-      const arrayLength = parseInt(type.substring(type.indexOf('[') + 1, type.indexOf(']')));
-      return this.getSingleFieldSize(baseType) * arrayLength;
+      const baseType = type.substring(0, type.indexOf('['))
+      const arrayLength = parseInt(type.substring(type.indexOf('[') + 1, type.indexOf(']')))
+      return this.getSingleFieldSize(baseType) * arrayLength
     }
-    
-    return this.getSingleFieldSize(type);
+
+    return this.getSingleFieldSize(type)
   }
 
   private getSingleFieldSize(type: string): number {
@@ -242,20 +256,20 @@ export class XMLParser {
       case 'uint8_t':
       case 'int8_t':
       case 'char':
-        return 1;
+        return 1
       case 'uint16_t':
       case 'int16_t':
-        return 2;
+        return 2
       case 'uint32_t':
       case 'int32_t':
       case 'float':
-        return 4;
+        return 4
       case 'uint64_t':
       case 'int64_t':
       case 'double':
-        return 8;
+        return 8
       default:
-        return 1;
+        return 1
     }
   }
 }
