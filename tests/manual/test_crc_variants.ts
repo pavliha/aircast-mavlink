@@ -1,12 +1,13 @@
 #!/usr/bin/env tsx
 
 // Test different CRC implementations to find the one that matches gomavlib
+(() => {
 const data = new Uint8Array([0x06, 0x00, 0xff, 0xbe, 0x42, 0x01, 0x00, 0x01, 0x00, 0x01, 0x01]);
 const crcExtra = 148;
 const expected = 0xc453;
 
 console.log('🔍 Testing different CRC implementations');
-console.log('Data:', Array.from(data).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+console.log('Data:', Array.from(data).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
 console.log('CRC_EXTRA:', crcExtra);
 console.log('Expected:', '0x' + expected.toString(16));
 console.log();
@@ -120,3 +121,4 @@ console.log('\n=== ANALYSIS ===');
 console.log(`Expected: 0x${expected.toString(16)} (${expected})`);
 console.log(`Current:  0x${crc1_current(data, crcExtra).toString(16)} (${crc1_current(data, crcExtra)})`);
 console.log(`Difference: ${Math.abs(expected - crc1_current(data, crcExtra))}`);
+})();

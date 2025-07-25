@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { CommonSerializer } from './src/generated/dialects/common/index.js';
+import { CommonSerializer } from '../../src/generated/dialects/common';
 import { spawn } from 'child_process';
 
 const serializer = new CommonSerializer();
@@ -95,7 +95,7 @@ async function runTests() {
       // Serialize the message using our corrected MCRF4XX implementation
       const serializedBytes = serializer.serialize(test.message);
       console.log('✅ Serialized successfully');
-      console.log('📦 Bytes:', Array.from(serializedBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+      console.log('📦 Bytes:', Array.from(serializedBytes).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
       
       // Extract checksum for display
       const checksumLow = serializedBytes[serializedBytes.length - 2];

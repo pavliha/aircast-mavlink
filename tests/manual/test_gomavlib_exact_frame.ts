@@ -50,7 +50,7 @@ async function validateWithGomavlib(frameBytes: number[]): Promise<any> {
 
 async function runTest() {
   console.log('🧪 Testing gomavlib-generated frame for validation...\n');
-  console.log('Frame bytes:', gomavlibFrame.map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+  console.log('Frame bytes:', gomavlibFrame.map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
   console.log('Checksum: 0x8234');
 
   try {

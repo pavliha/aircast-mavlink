@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { CommonSerializer } from './src/generated/dialects/common/index.js';
+import { CommonSerializer } from '../../src/generated/dialects/common';
 
 // Test REQUEST_DATA_STREAM with different message rates to see if any produces the expected checksum
 const serializer = new CommonSerializer();
@@ -44,7 +44,7 @@ for (const testCase of testCases) {
       const payloadLength = serialized[1];
       const payload = serialized.slice(payloadStart, payloadStart + payloadLength);
       
-      console.log(`Payload: ${Array.from(payload).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
+      console.log(`Payload: ${Array.from(payload).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
       console.log(`Checksum: 0x${checksum.toString(16).padStart(4, '0')}`);
       
       if (checksum === 0x003c) {

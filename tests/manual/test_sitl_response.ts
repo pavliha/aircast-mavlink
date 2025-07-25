@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { CommonSerializer } from './src/generated/dialects/common/index.js';
+import { CommonSerializer } from '../../src/generated/dialects/common';
 import { createConnection } from 'net';
 
 const serializer = new CommonSerializer();
@@ -52,7 +52,7 @@ async function testSITLResponse() {
         
         console.log('📤 Sending REQUEST_DATA_STREAM for GPS telemetry...');
         const requestFrame = serializer.serialize(requestDataStream);
-        console.log('Frame:', Array.from(requestFrame).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+        console.log('Frame:', Array.from(requestFrame).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
         socket.write(requestFrame);
         
         console.log('⏳ Waiting for SITL response...\n');
@@ -75,7 +75,7 @@ async function testSITLResponse() {
       responseCount++;
       
       console.log(`📥 Response #${responseCount} (${data.length} bytes):`);
-      console.log('   Raw:', Array.from(data).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+      console.log('   Raw:', Array.from(data).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
       
       // Try to parse MAVLink messages
       while (receivedData.length > 0) {

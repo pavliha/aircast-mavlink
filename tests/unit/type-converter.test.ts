@@ -380,8 +380,9 @@ describe('TypeConverter', () => {
         const result = (converter as any).convertMessage(messageDef, []);
         expect(result).toBeDefined();
         expect(result.fields).toHaveLength(2);
-        expect(result.fields[0].name).toBe('valid_field');
-        expect(result.fields[1].name).toBe('another_valid');
+        // Fields are sorted by size: uint16_t (2 bytes) before uint8_t (1 byte)
+        expect(result.fields[0].name).toBe('another_valid');
+        expect(result.fields[1].name).toBe('valid_field');
       });
     });
 

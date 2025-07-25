@@ -259,9 +259,13 @@ describe('Edge Cases and Error Conditions', () => {
         0x01,                    // System ID
         0x01,                    // Component ID
         0x00,                    // Message ID (HEARTBEAT)
-        0x01, 0x03, 0x00,        // Payload: type=1, autopilot=3, base_mode=0
+        // Wire format: custom_mode first (uint32_t), then uint8_t fields
         0x00, 0x00, 0x00, 0x00,  // custom_mode=0 (uint32_t, little endian)
-        0x04, 0x03,              // system_status=4, mavlink_version=3
+        0x01,                    // type=1
+        0x03,                    // autopilot=3
+        0x00,                    // base_mode=0
+        0x04,                    // system_status=4
+        0x03,                    // mavlink_version=3
         0x68, 0x00               // Checksum (calculated)
       ]);
 

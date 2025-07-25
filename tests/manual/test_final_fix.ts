@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { CommonSerializer } from './src/generated/dialects/common/index.js';
+import { CommonSerializer } from '../../src/generated/dialects/common';
 
 const serializer = new CommonSerializer();
 
@@ -24,7 +24,7 @@ console.log('🚀 Testing REQUEST_DATA_STREAM with gomavlib-compatible parameter
 try {
   const serialized = serializer.serialize(message);
   
-  console.log('Generated frame:', Array.from(serialized).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+  console.log('Generated frame:', Array.from(serialized).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
   console.log('Expected frame: 0xfe 0x06 0x00 0xff 0xbe 0x42 0x01 0x00 0x01 0x01 0x00 0x01 0x34 0x82');
   
   // Compare byte by byte

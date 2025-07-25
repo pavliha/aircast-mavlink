@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { CommonSerializer } from './src/generated/dialects/common/index.js';
+import { CommonSerializer } from '../../src/generated/dialects/common';
 
 // Test the exact parameters from the PCAP analysis that should produce 0x003c
 const testCases = [
@@ -46,7 +46,7 @@ for (const testCase of testCases) {
     console.log('Message:', JSON.stringify(testCase.message, null, 2));
 
     const serialized = serializer.serialize(testCase.message);
-    console.log('Serialized bytes:', Array.from(serialized).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+    console.log('Serialized bytes:', Array.from(serialized).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
     
     // Extract checksum from the serialized frame
     if (serialized.length >= 2) {

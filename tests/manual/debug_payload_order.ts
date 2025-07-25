@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { CommonSerializer } from './src/generated/dialects/common/index.js';
+import { CommonSerializer } from '../../src/generated/dialects/common';
 
 const serializer = new CommonSerializer();
 
@@ -52,11 +52,11 @@ for (const testCase of testCases) {
   try {
     const serialized = serializer.serialize(message);
     
-    console.log('Full frame:', Array.from(serialized).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+    console.log('Full frame:', Array.from(serialized).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
     
     // Extract payload (6 bytes after header)
     const payloadBytes = serialized.slice(6, 6 + 6);
-    console.log('Payload only:', Array.from(payloadBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+    console.log('Payload only:', Array.from(payloadBytes).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
     
     // Show field by field
     console.log('Field breakdown:');

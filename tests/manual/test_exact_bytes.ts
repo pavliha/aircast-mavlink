@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 
 // Test the exact MCRF4XX algorithm on the exact bytes from PCAP analysis
+(() => {
 function mcrf4xxCrc(data: Uint8Array, crcExtra: number): number {
   let crc = 0xffff;
 
@@ -25,7 +26,7 @@ const messageData = new Uint8Array([0x06, 0x00, 0x01, 0x01, 0x42, 0x00, 0x02, 0x
 const crcExtra = 148; // CRC_EXTRA for REQUEST_DATA_STREAM (ID 66)
 
 console.log('Testing exact PCAP bytes...');
-console.log('Message data:', Array.from(messageData).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+console.log('Message data:', Array.from(messageData).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
 console.log('CRC_EXTRA:', crcExtra);
 
 const calculatedCrc = mcrf4xxCrc(messageData, crcExtra);
@@ -55,3 +56,4 @@ if (calculatedCrc !== 0x003c) {
   // Maybe it's a different algorithm entirely?
   console.log('\nTesting with table-based CRC for comparison...');
 }
+})();

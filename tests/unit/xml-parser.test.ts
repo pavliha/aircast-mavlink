@@ -503,13 +503,13 @@ describe('XMLParser', () => {
     });
 
     describe('edge cases and error handling', () => {
-      test('should handle extension fields marked with "extensions" string', async () => {
+      test('should handle extension fields marked with "extensions" element', async () => {
         const xmlContent = `<?xml version="1.0"?>
 <mavlink>
   <messages>
     <message name="EXTENSION_TEST" id="1">
       <field name="normal_field" type="uint8_t">Normal field</field>
-      <field name="extensions" type="string">extensions</field>
+      <extensions/>
       <field name="extension_field" type="uint16_t">Extension field</field>
     </message>
   </messages>
@@ -524,7 +524,7 @@ describe('XMLParser', () => {
         const result = await parser.parseFromURL('https://example.com/extensions.xml');
         
         expect(result.messages).toHaveLength(1);
-        expect(result.messages![0].fields).toHaveLength(2); // Should skip "extensions" string
+        expect(result.messages![0].fields).toHaveLength(2);
         expect(result.messages![0].fields[0].name).toBe('normal_field');
         expect(result.messages![0].fields[0].extension).toBeFalsy();
         expect(result.messages![0].fields[1].name).toBe('extension_field');

@@ -178,13 +178,13 @@ export class TypeConverter {
 
   private sortFieldsBySize(fields: FieldDefinition[]): FieldDefinition[] {
     // Field size mapping based on MAVLink specification
-    // Arrays are sorted by element type size, not total array size
     const getFieldSize = (type: string): number => {
-      // Handle array types - sort by element type size, not total size
+      // Handle array types - sort by total array size
       const arrayMatch = type.match(/^(.+?)\[(\d+)\]$/)
       if (arrayMatch) {
         const baseType = arrayMatch[1]
-        return this.getBaseTypeSize(baseType)
+        const arraySize = parseInt(arrayMatch[2], 10)
+        return this.getBaseTypeSize(baseType) * arraySize
       }
       return this.getBaseTypeSize(type)
     }

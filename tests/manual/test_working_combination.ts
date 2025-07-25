@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { CommonSerializer } from './src/generated/dialects/common/index.js';
+import { CommonSerializer } from '../../src/generated/dialects/common';
 
 // Test REQUEST_DATA_STREAM serialization with parameters that should produce checksum 0x003c
 const serializer = new CommonSerializer();
@@ -67,7 +67,7 @@ for (const combo of workingCombinations) {
 
   try {
     const serialized = serializer.serialize(combo.message);
-    const actualBytes = Array.from(serialized).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    const actualBytes = Array.from(serialized).map((b: number) => b.toString(16).padStart(2, '0')).join(' ');
     
     console.log('Expected bytes:', combo.expected_bytes);
     console.log('Actual bytes:  ', actualBytes);

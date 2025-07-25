@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { CommonSerializer } from './src/generated/dialects/common/index.js';
+import { CommonSerializer } from '../../src/generated/dialects/common';
 import { spawn } from 'child_process';
 
 const serializer = new CommonSerializer();
@@ -71,7 +71,7 @@ async function runFinalVerification() {
     const serialized = serializer.serialize(message);
     
     console.log('✅ Serialization successful');
-    console.log('📦 Frame:', Array.from(serialized).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+    console.log('📦 Frame:', Array.from(serialized).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
     
     const checksum = serialized[serialized.length-2] | (serialized[serialized.length-1] << 8);
     console.log(`🔐 Generated checksum: 0x${checksum.toString(16).padStart(4, '0')}`);

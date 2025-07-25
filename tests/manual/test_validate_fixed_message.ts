@@ -50,7 +50,7 @@ async function validateWithGomavlib(): Promise<any> {
 
 async function runTest() {
   console.log('🧪 Testing corrected REQUEST_DATA_STREAM with gomavlib validation...\n');
-  console.log('Frame bytes:', correctedBytes.map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+  console.log('Frame bytes:', correctedBytes.map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
   console.log('Checksum: 0xe3d8');
 
   try {

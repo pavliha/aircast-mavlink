@@ -1,11 +1,12 @@
 #!/usr/bin/env tsx
 
 // Debug CRC calculation step by step
+(() => {
 const data = new Uint8Array([0x06, 0x00, 0xff, 0xbe, 0x42, 0x01, 0x00, 0x01, 0x00, 0x01, 0x01]);
 const crcExtra = 148;
 
 console.log('🔍 Step-by-step CRC calculation debug');
-console.log('Data:', Array.from(data).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+console.log('Data:', Array.from(data).map((b: number) => '0x' + b.toString(16).padStart(2, '0')).join(' '));
 console.log('CRC_EXTRA:', crcExtra, '(0x' + crcExtra.toString(16) + ')');
 console.log('Expected result: 0xc453');
 console.log('Our result: 0xf502');
@@ -75,3 +76,4 @@ for (let testCrcExtra = 140; testCrcExtra <= 155; testCrcExtra++) {
     console.log(`🎯 FOUND IT! CRC_EXTRA ${testCrcExtra} (0x${testCrcExtra.toString(16)}) gives 0x${testResult.toString(16)}`);
   }
 }
+})();
