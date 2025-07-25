@@ -4,7 +4,7 @@
  */
 
 export interface MessageOverrides {
-  [key: string]: any;
+  [key: string]: any
 }
 
 export const testMessages = {
@@ -23,9 +23,9 @@ export const testMessages = {
       custom_mode: 12345,
       system_status: 4,
       mavlink_version: 3,
-      ...overrides.payload
+      ...overrides.payload,
     },
-    ...overrides
+    ...overrides,
   }),
 
   /**
@@ -37,9 +37,9 @@ export const testMessages = {
     component_id: 1,
     sequence: 5,
     payload: {
-      onboard_control_sensors_present: 0x3FFFFFFF,
-      onboard_control_sensors_enabled: 0x1FFFFFFF,
-      onboard_control_sensors_health: 0x0FFFFFFF,
+      onboard_control_sensors_present: 0x3fffffff,
+      onboard_control_sensors_enabled: 0x1fffffff,
+      onboard_control_sensors_health: 0x0fffffff,
       load: 500,
       voltage_battery: 11800,
       current_battery: 1500,
@@ -50,9 +50,9 @@ export const testMessages = {
       errors_count2: 0,
       errors_count3: 0,
       errors_count4: 0,
-      ...overrides.payload
+      ...overrides.payload,
     },
-    ...overrides
+    ...overrides,
   }),
 
   /**
@@ -67,22 +67,22 @@ export const testMessages = {
       time_usec: BigInt('1234567890123456'),
       fix_type: 3,
       lat: 473977420, // 47.3977420° (Seattle area)
-      lon: 85345200,  // 8.5345200° (Swiss area)
+      lon: 85345200, // 8.5345200° (Swiss area)
       alt: 54321,
       eph: 150,
       epv: 200,
       vel: 1250,
       cog: 18500,
       satellites_visible: 12,
-      ...overrides.payload
+      ...overrides.payload,
     },
-    ...overrides
+    ...overrides,
   }),
 
   /**
    * STATUSTEXT message for status reporting
    */
-  statusText: (text = "System initialized successfully", overrides: MessageOverrides = {}) => ({
+  statusText: (text = 'System initialized successfully', overrides: MessageOverrides = {}) => ({
     message_name: 'STATUSTEXT',
     system_id: 1,
     component_id: 1,
@@ -90,9 +90,9 @@ export const testMessages = {
     payload: {
       severity: 6,
       text,
-      ...overrides.payload
+      ...overrides.payload,
     },
-    ...overrides
+    ...overrides,
   }),
 
   /**
@@ -113,9 +113,9 @@ export const testMessages = {
       vy: -32768,
       vz: -32768,
       hdg: 36000,
-      ...overrides.payload
+      ...overrides.payload,
     },
-    ...overrides
+    ...overrides,
   }),
 
   /**
@@ -134,9 +134,9 @@ export const testMessages = {
       rollspeed: 0.01,
       pitchspeed: -0.02,
       yawspeed: 0.03,
-      ...overrides.payload
+      ...overrides.payload,
     },
-    ...overrides
+    ...overrides,
   }),
 
   /**
@@ -169,9 +169,9 @@ export const testMessages = {
       chan17_raw: 0,
       chan18_raw: 0,
       rssi: 255,
-      ...overrides.payload
+      ...overrides.payload,
     },
-    ...overrides
+    ...overrides,
   }),
 
   /**
@@ -183,12 +183,12 @@ export const testMessages = {
     component_id: 1,
     sequence: 0,
     payload: {
-      brkval: 0,      // Default values as per serializer behavior
+      brkval: 0, // Default values as per serializer behavior
       freemem: 0,
       freemem32: 0,
-      ...overrides.payload
+      ...overrides.payload,
     },
-    ...overrides
+    ...overrides,
   }),
 
   /**
@@ -200,7 +200,7 @@ export const testMessages = {
     component_id: 1,
     sequence: 0,
     payload: {
-      mag_ofs_x: 0,       // Default values as per serializer behavior
+      mag_ofs_x: 0, // Default values as per serializer behavior
       mag_ofs_y: 0,
       mag_ofs_z: 0,
       mag_declination: 0,
@@ -212,11 +212,11 @@ export const testMessages = {
       accel_cal_x: 0,
       accel_cal_y: 0,
       accel_cal_z: 0,
-      ...overrides.payload
+      ...overrides.payload,
     },
-    ...overrides
-  })
-};
+    ...overrides,
+  }),
+}
 
 /**
  * Edge case test data for boundary testing
@@ -225,60 +225,63 @@ export const edgeCaseMessages = {
   /**
    * HEARTBEAT with maximum values
    */
-  heartbeatMaxValues: () => testMessages.heartbeat({
-    system_id: 255,
-    component_id: 255,
-    sequence: 255,
-    payload: {
-      type: 255,
-      autopilot: 255,
-      base_mode: 255,
-      custom_mode: 4294967295,
-      system_status: 255,
-      mavlink_version: 3
-    }
-  }),
+  heartbeatMaxValues: () =>
+    testMessages.heartbeat({
+      system_id: 255,
+      component_id: 255,
+      sequence: 255,
+      payload: {
+        type: 255,
+        autopilot: 255,
+        base_mode: 255,
+        custom_mode: 4294967295,
+        system_status: 255,
+        mavlink_version: 3,
+      },
+    }),
 
   /**
    * HEARTBEAT with zero values
    */
-  heartbeatZeroValues: () => testMessages.heartbeat({
-    system_id: 0,
-    component_id: 0,
-    sequence: 0,
-    payload: {
-      type: 0,
-      autopilot: 0,
-      base_mode: 0,
-      custom_mode: 0,
-      system_status: 0,
-      mavlink_version: 3
-    }
-  }),
+  heartbeatZeroValues: () =>
+    testMessages.heartbeat({
+      system_id: 0,
+      component_id: 0,
+      sequence: 0,
+      payload: {
+        type: 0,
+        autopilot: 0,
+        base_mode: 0,
+        custom_mode: 0,
+        system_status: 0,
+        mavlink_version: 3,
+      },
+    }),
 
   /**
    * GPS with extreme coordinate values
    */
-  gpsExtremeValues: () => testMessages.gpsRawInt({
-    payload: {
-      time_usec: BigInt('18446744073709551615'),
-      fix_type: 255,
-      lat: 2147483647,
-      lon: -2147483648,
-      alt: 54321,
-      eph: 65535,
-      epv: 200,
-      vel: 1250,
-      cog: 18500,
-      satellites_visible: 255
-    }
-  }),
+  gpsExtremeValues: () =>
+    testMessages.gpsRawInt({
+      payload: {
+        time_usec: BigInt('18446744073709551615'),
+        fix_type: 255,
+        lat: 2147483647,
+        lon: -2147483648,
+        alt: 54321,
+        eph: 65535,
+        epv: 200,
+        vel: 1250,
+        cog: 18500,
+        satellites_visible: 255,
+      },
+    }),
 
   /**
    * STATUSTEXT with maximum length text
    */
-  statusTextMaxLength: () => testMessages.statusText('A'.repeat(50))
-};
+  statusTextMaxLength: () => testMessages.statusText('A'.repeat(50)),
+}
 
 /**
  * Multi-message test sequences
@@ -290,7 +293,7 @@ export const messageSequences = {
   systemStartup: () => [
     testMessages.heartbeat({ sequence: 0 }),
     testMessages.sysStatus({ sequence: 1 }),
-    testMessages.statusText("System ready", { sequence: 2 })
+    testMessages.statusText('System ready', { sequence: 2 }),
   ],
 
   /**
@@ -299,6 +302,6 @@ export const messageSequences = {
   navigationData: () => [
     testMessages.gpsRawInt({ sequence: 10 }),
     testMessages.attitude({ sequence: 11 }),
-    testMessages.globalPositionInt({ sequence: 12 })
-  ]
-};
+    testMessages.globalPositionInt({ sequence: 12 }),
+  ],
+}
