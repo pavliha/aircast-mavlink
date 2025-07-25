@@ -104,6 +104,7 @@ export interface XMLMessage {
   $: { id: string; name: string };
   description?: string;
   field?: XMLField | XMLField[];
+  extensions?: string; // MAVLink extensions marker
 }
 
 export interface XMLField {

@@ -669,7 +669,79 @@ abstract class DialectParser {
       offset += bytesWritten;
     }
 
-    return new Uint8Array(buffer);
+    // Implement MAVLink payload trimming: remove trailing zero bytes from extension fields only
+    // This is required for proper handling of extension fields
+    const fullPayload = new Uint8Array(buffer);
+    
+    // Calculate minimum payload size (core fields only)
+    let corePayloadSize = 0;
+    let extensionStartOffset = 0;
+    let hasExtensions = false;
+    
+    const messageName = message.message_name as string;
+    
+    for (const field of fields) {
+      const fieldSize = this.getFieldSize(field);
+      
+      // Check if this is an extension field using proper XML-based detection
+      const isExtensionField = field.extension === true;
+      
+      if (isExtensionField) {
+        if (!hasExtensions) {
+          extensionStartOffset = corePayloadSize;
+          hasExtensions = true;
+        }
+        // Don't add extension field sizes to core payload size
+      } else {
+        // This is a core field - always add to core payload size
+        corePayloadSize += fieldSize;
+      }
+    }
+    
+    // If there are no extension fields, don't trim at all
+    if (!hasExtensions) {
+      return fullPayload;
+    }
+    
+    // Find the last non-zero byte in extension fields only
+    let trimmedLength = fullPayload.length;
+    
+    // If we have extensions, check if they contain any non-zero bytes
+    if (hasExtensions && extensionStartOffset < fullPayload.length) {
+      // Look for non-zero bytes in the extension section
+      let hasNonZeroExtensions = false;
+      for (let i = extensionStartOffset; i < fullPayload.length; i++) {
+        if (fullPayload[i] !== 0) {
+          hasNonZeroExtensions = true;
+          break;
+        }
+      }
+      
+      if (!hasNonZeroExtensions) {
+        // All extension fields are zero, trim them all
+        trimmedLength = corePayloadSize;
+      } else {
+        // Find the last non-zero byte in extension fields
+        for (let i = fullPayload.length - 1; i >= extensionStartOffset; i--) {
+          if (fullPayload[i] !== 0) {
+            trimmedLength = i + 1;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Never trim below the core payload size
+    if (trimmedLength < corePayloadSize) {
+      trimmedLength = corePayloadSize;
+    }
+
+    // Return trimmed payload if it's shorter than the original
+    if (trimmedLength < fullPayload.length) {
+      return fullPayload.slice(0, trimmedLength);
+    }
+    
+    return fullPayload;
   }
 
   private serializeField(view: DataView, offset: number, field: FieldDefinition, value: unknown): number {
@@ -759,6 +831,7 @@ abstract class DialectParser {
     }
   }
 
+
   private getFieldSize(field: FieldDefinition | string): number {
     if (typeof field === 'string') {
       // Legacy support for type string
@@ -835,11 +908,17 @@ abstract class DialectParser {
     const componentId = typeof message.component_id === 'number' ? message.component_id : 1;
     const sequence = typeof message.sequence === 'number' ? message.sequence : 0;
     
-    // Use MAVLink v1 for SITL compatibility
-    const magic = 0xFE; // MAVLink v1
+    // Automatically determine protocol version based on message requirements
+    const needsV2 = messageId > 255; // v1 only supports 8-bit message IDs (0-255)
+    const userSpecifiedVersion = typeof message.protocol_version === 'number' ? message.protocol_version : null;
     
-    // MAVLink v1 header: magic(1) + len(1) + seq(1) + sysid(1) + compid(1) + msgid(1) + payload + checksum(2)
-    const headerSize = 6;
+    // Use user-specified version if provided, otherwise auto-detect
+    const protocolVersion = userSpecifiedVersion !== null ? userSpecifiedVersion : (needsV2 ? 2 : 1);
+    const isV2 = protocolVersion === 2;
+    const magic = isV2 ? 0xFD : 0xFE;
+    
+    // Calculate frame size based on protocol version
+    const headerSize = isV2 ? 10 : 6; // v2 has extra fields
     const frameSize = headerSize + payload.length + 2;
     const buffer = new ArrayBuffer(frameSize);
     const view = new DataView(buffer);
@@ -849,10 +928,25 @@ abstract class DialectParser {
     // Header
     view.setUint8(offset++, magic);
     view.setUint8(offset++, payload.length);
-    view.setUint8(offset++, sequence);
-    view.setUint8(offset++, systemId);
-    view.setUint8(offset++, componentId);
-    view.setUint8(offset++, messageId & 0xFF); // 8-bit message ID in v1
+    
+    if (isV2) {
+      // MAVLink v2: magic(1) + len(1) + incompat_flags(1) + compat_flags(1) + seq(1) + sysid(1) + compid(1) + msgid(3) + payload + checksum(2)
+      view.setUint8(offset++, 0); // incompat_flags
+      view.setUint8(offset++, 0); // compat_flags
+      view.setUint8(offset++, sequence);
+      view.setUint8(offset++, systemId);
+      view.setUint8(offset++, componentId);
+      // 24-bit message ID in v2
+      view.setUint8(offset++, messageId & 0xFF);
+      view.setUint8(offset++, (messageId >> 8) & 0xFF);
+      view.setUint8(offset++, (messageId >> 16) & 0xFF);
+    } else {
+      // MAVLink v1: magic(1) + len(1) + seq(1) + sysid(1) + compid(1) + msgid(1) + payload + checksum(2)
+      view.setUint8(offset++, sequence);
+      view.setUint8(offset++, systemId);
+      view.setUint8(offset++, componentId);
+      view.setUint8(offset++, messageId & 0xFF); // 8-bit message ID in v1
+    }
     
     // Payload
     const payloadView = new Uint8Array(buffer, offset, payload.length);

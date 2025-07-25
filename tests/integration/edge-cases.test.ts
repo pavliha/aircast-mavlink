@@ -111,8 +111,8 @@ describe('Edge Cases and Error Conditions', () => {
       corrupted[corrupted.length - 2] = 0xFF;
 
       const parsed = parser.parseBytes(corrupted);
-      expect(parsed).toHaveLength(1); // Should still parse (CRC validation is simplified)
-      expect(parsed[0].crc_ok).toBe(true); // But mark CRC as not verified
+      expect(parsed).toHaveLength(1); // Should still parse
+      expect(parsed[0].crc_ok).toBe(false); // But mark CRC as invalid
     });
   });
 
@@ -281,6 +281,7 @@ describe('Edge Cases and Error Conditions', () => {
       system_id: 1,
       component_id: 1,
       sequence: 0,
+      protocol_version: 2,
       payload: {
           type: 2,
         autopilot: 12,
@@ -320,6 +321,7 @@ describe('Edge Cases and Error Conditions', () => {
       system_id: 2,
       component_id: 2,
       sequence: 1,
+      protocol_version: 2,
       payload: {
           type: 2,
         autopilot: 12,

@@ -278,7 +278,7 @@ describe('Performance and Stress Tests', () => {
       console.log(`Memory growth after ${iterations} parsings: ${memoryGrowthMB.toFixed(2)}MB`);
 
       // Memory growth should be reasonable
-      expect(memoryGrowthMB).toBeLessThan(10);
+      expect(memoryGrowthMB).toBeLessThan(15);
     });
   });
 

@@ -23,13 +23,15 @@ describe('TemplateEngine', () => {
     ],
     messages: [
       {
+        id: 0,
         name: 'MessageHeartbeat',
         originalName: 'HEARTBEAT',
         description: ['The heartbeat message'],
         fields: [
           { name: 'Type', type: 'MAV_TYPE', description: ['Vehicle type'], optional: false },
           { name: 'Autopilot', type: 'MAV_AUTOPILOT', description: ['Autopilot type'], optional: false }
-        ]
+        ],
+        crcExtra: 50
       }
     ]
   };
@@ -320,7 +322,8 @@ describe('TemplateEngine Enhanced Tests', () => {
                 description: ['Test field'],
                 optional: false
               }
-            ]
+            ],
+            crcExtra: 50
           }
         ]
       };
@@ -340,7 +343,8 @@ describe('TemplateEngine Enhanced Tests', () => {
             name: 'TEST_MESSAGE',
             originalName: 'DIFFERENT_NAME',
             description: ['Test message'],
-            fields: []
+            fields: [],
+            crcExtra: 50
           }
         ]
       };
@@ -477,7 +481,8 @@ describe('TemplateEngine Enhanced Tests', () => {
                 description: ['Enum field'],
                 optional: false
               }
-            ]
+            ],
+            crcExtra: 50
           }
         ]
       };
@@ -576,7 +581,8 @@ describe('TemplateEngine Enhanced Tests', () => {
                 description: ['Normal field'],
                 optional: false
               }
-            ]
+            ],
+            crcExtra: 50
           }
         ]
       };
@@ -618,7 +624,8 @@ describe('TemplateEngine Enhanced Tests', () => {
                 description: ['Array enum field'],
                 optional: false
               }
-            ]
+            ],
+            crcExtra: 50
           }
         ]
       };
@@ -667,7 +674,8 @@ describe('TemplateEngine Enhanced Tests', () => {
             name: 'EMPTY_MESSAGE',
             originalName: 'EMPTY_MESSAGE',
             description: ['Empty message'],
-            fields: []
+            fields: [],
+            crcExtra: 50
           }
         ]
       };
@@ -709,7 +717,8 @@ describe('TemplateEngine Enhanced Tests', () => {
                 description: ['Single field'],
                 optional: false
               }
-            ]
+            ],
+            crcExtra: 50
           }
         ]
       };
@@ -745,7 +754,8 @@ describe('TemplateEngine Enhanced Tests', () => {
                 description: ['Optional field'],
                 optional: true
               }
-            ]
+            ],
+            crcExtra: 50
           }
         ]
       };
@@ -837,7 +847,8 @@ describe('TemplateEngine Enhanced Tests', () => {
                 description: [],
                 optional: false
               }
-            ]
+            ],
+            crcExtra: 50
           }
         ]
       };

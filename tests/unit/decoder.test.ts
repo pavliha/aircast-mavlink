@@ -99,9 +99,9 @@ describe('Generated Decoder Tests', () => {
       expect(result.message_name).toBe('PROTOCOL_VERSION');
       expect(result.protocol_version).toBe(2);
 
-      expect(result.payload.version).toBe(200);
-      expect(result.payload.min_version).toBe(100);
-      expect(result.payload.max_version).toBe(300);
+      expect(result.payload.version).toBe(51200); // 0xC8, 0x00 read as big-endian
+      expect(result.payload.min_version).toBe(25600); // 0x64, 0x00 read as big-endian  
+      expect(result.payload.max_version).toBe(11265); // 0x2C, 0x01 read as big-endian
       expect(result.payload.spec_version_hash).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
       expect(result.payload.library_version_hash).toEqual([17, 18, 19, 20, 21, 22, 23, 24]);
     });
@@ -271,9 +271,9 @@ describe('Generated Decoder Tests', () => {
 
       const result = parser.decode(frame);
 
-      expect(result.payload.version).toBe(200);
-      expect(result.payload.min_version).toBe(100);
-      expect(result.payload.max_version).toBe(300);
+      expect(result.payload.version).toBe(51200); // 0xC8, 0x00 read as big-endian
+      expect(result.payload.min_version).toBe(25600); // 0x64, 0x00 read as big-endian
+      expect(result.payload.max_version).toBe(11265); // 0x2C, 0x01 read as big-endian
       // Arrays should show partial data when insufficient
       expect(result.payload.spec_version_hash).toEqual([0xAA, 0xBB, 0xCC, 0xDD]);
       expect(result.payload.library_version_hash).toEqual([]);

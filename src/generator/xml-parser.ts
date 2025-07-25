@@ -169,20 +169,19 @@ export class XMLParser {
     if (messageData.field) {
       const fields = Array.isArray(messageData.field) ? messageData.field : [messageData.field];
       let inExtensions = false;
+      let extensionMarkerFound = false;
 
       for (const field of fields) {
-        if (typeof field === 'string' && field === 'extensions') {
+        // Check if this field is the extensions marker
+        if (typeof field === 'object' && field && field.$ && field.$.name === 'extensions') {
+          // This is the extensions marker - set flag and skip adding as a field
           inExtensions = true;
+          extensionMarkerFound = true;
           continue;
         }
-
-        if (typeof field === 'object' && field.$ && field.$.name && field.$.type) {
-          // Skip fields named "extensions" as they are markers, not actual fields
-          if (field.$.name === 'extensions') {
-            inExtensions = true;
-            continue;
-          }
-          
+        
+        // XMLField should always be an object with $ property
+        if (typeof field === 'object' && field && field.$ && field.$.name && field.$.type) {
           const fieldDef: FieldDefinition = {
             name: field.$.name,
             type: field.$.type,
@@ -193,6 +192,31 @@ export class XMLParser {
           messageDef.fields.push(fieldDef);
         }
       }
+
+      // If no explicit extensions marker was found in fields but message has extensions element,
+      // it means all fields after a certain point are extensions (legacy format)
+      if (!extensionMarkerFound && messageData.extensions !== undefined) {
+        // For legacy XML format without explicit extensions field marker,
+        // we need to use a heuristic based on MAVLink v1 payload limit
+        // This is a fallback for older message definitions
+        let corePayloadSize = 0;
+        const maxV1PayloadSize = 255; // MAVLink v1 maximum payload size
+        
+        for (let i = 0; i < messageDef.fields.length; i++) {
+          const field = messageDef.fields[i];
+          const fieldSize = this.getFieldSize(field.type);
+          
+          // If adding this field would exceed v1 limit, mark it and all following as extensions
+          if (corePayloadSize + fieldSize > maxV1PayloadSize) {
+            for (let j = i; j < messageDef.fields.length; j++) {
+              messageDef.fields[j].extension = true;
+            }
+            break;
+          }
+          
+          corePayloadSize += fieldSize;
+        }
+      }
     }
 
     return messageDef;
@@ -200,5 +224,38 @@ export class XMLParser {
 
   reset(): void {
     this.processedUrls.clear();
+  }
+
+  private getFieldSize(type: string): number {
+    // Handle array types
+    if (type.includes('[') && type.includes(']')) {
+      const baseType = type.substring(0, type.indexOf('['));
+      const arrayLength = parseInt(type.substring(type.indexOf('[') + 1, type.indexOf(']')));
+      return this.getSingleFieldSize(baseType) * arrayLength;
+    }
+    
+    return this.getSingleFieldSize(type);
+  }
+
+  private getSingleFieldSize(type: string): number {
+    switch (type) {
+      case 'uint8_t':
+      case 'int8_t':
+      case 'char':
+        return 1;
+      case 'uint16_t':
+      case 'int16_t':
+        return 2;
+      case 'uint32_t':
+      case 'int32_t':
+      case 'float':
+        return 4;
+      case 'uint64_t':
+      case 'int64_t':
+      case 'double':
+        return 8;
+      default:
+        return 1;
+    }
   }
 }

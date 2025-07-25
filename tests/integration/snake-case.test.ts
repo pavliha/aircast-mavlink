@@ -18,6 +18,7 @@ describe('Snake Case Integration Tests - Message Parsing and Serialization', () 
       system_id: 1,
       component_id: 1,
       sequence: 42,
+      protocol_version: 2,
       payload: {
           type: 6,
           autopilot: 8,

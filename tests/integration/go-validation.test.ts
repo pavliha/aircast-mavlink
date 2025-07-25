@@ -166,7 +166,8 @@ describe('Go Application MAVLink Validation', () => {
       const message = testMessages.heartbeat({
         system_id: 255,
         component_id: 190,
-        sequence: 42
+        sequence: 42,
+        protocol_version: 2
       });
 
       const result = testBase.roundTripTest(message);
