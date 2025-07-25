@@ -518,7 +518,7 @@ abstract class DialectParser {
         case 'int8_t':
           return { value: view.getInt8(offset), bytesRead: 1 };
         case 'uint16_t':
-          return { value: view.getUint16(offset, false), bytesRead: 2 };
+          return { value: view.getUint16(offset, true), bytesRead: 2 };
         case 'int16_t':
           return { value: view.getInt16(offset, true), bytesRead: 2 };
         case 'uint32_t':
@@ -806,7 +806,7 @@ abstract class DialectParser {
         view.setInt8(offset, Number(actualValue));
         return 1;
       case 'uint16_t':
-        view.setUint16(offset, Number(actualValue), false);
+        view.setUint16(offset, Number(actualValue), true);
         return 2;
       case 'int16_t':
         view.setInt16(offset, Number(actualValue), true);

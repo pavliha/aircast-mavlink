@@ -38,7 +38,7 @@ export class XMLParser {
         }
 
         try {
-          const definition = await this.processDefinition(result.mavlink, source)
+          const definition = await this.processDefinition(result.mavlink, source, xmlContent)
           resolve(definition)
         } catch (error) {
           reject(error)
@@ -49,7 +49,8 @@ export class XMLParser {
 
   private async processDefinition(
     mavlinkData: MAVLinkDialect,
-    source: string
+    source: string,
+    rawXmlContent?: string
   ): Promise<MAVLinkDialectDefinition> {
     if (!mavlinkData) {
       // Return empty definition for XML without mavlink root
@@ -114,7 +115,7 @@ export class XMLParser {
         ? mavlinkData.messages.message
         : [mavlinkData.messages.message]
       for (const messageData of messages) {
-        const messageDef = this.processMessage(messageData)
+        const messageDef = this.processMessage(messageData, rawXmlContent)
         if (messageDef) {
           definition.messages!.push(messageDef)
         }
@@ -168,7 +169,10 @@ export class XMLParser {
     return enumDef
   }
 
-  private processMessage(messageData: XMLMessage): MessageDefinition | null {
+  private processMessage(
+    messageData: XMLMessage,
+    rawXmlContent?: string
+  ): MessageDefinition | null {
     if (!messageData.$ || !messageData.$.name || !messageData.$.id) {
       return null
     }
@@ -182,37 +186,36 @@ export class XMLParser {
 
     if (messageData.field) {
       const fields = Array.isArray(messageData.field) ? messageData.field : [messageData.field]
-      let inExtensions = false
-      let extensionMarkerFound = false
+
+      // Check if extensions marker exists as separate element (XML2JS parses <extensions/> as a separate property)
+      const hasExtensionsElement = messageData.extensions !== undefined
+
+      // If we have extensions, we need to determine which fields are extensions
+      let extensionFieldNames: Set<string> = new Set()
+
+      if (hasExtensionsElement && rawXmlContent) {
+        extensionFieldNames = this.findExtensionFields(messageDef.name, rawXmlContent)
+      }
 
       for (const field of fields) {
-        // Check if this field is the extensions marker
-        if (typeof field === 'object' && field && field.$ && field.$.name === 'extensions') {
-          // This is the extensions marker - set flag and skip adding as a field
-          inExtensions = true
-          extensionMarkerFound = true
-          continue
-        }
-
         // XMLField should always be an object with $ property
         if (typeof field === 'object' && field && field.$ && field.$.name && field.$.type) {
+          const isExtension = extensionFieldNames.has(field.$.name)
+
           const fieldDef: FieldDefinition = {
             name: field.$.name,
             type: field.$.type,
             enum: field.$.enum,
             description: field.description || field._ || '',
-            extension: inExtensions,
+            extension: isExtension,
           }
           messageDef.fields.push(fieldDef)
         }
       }
 
-      // If no explicit extensions marker was found in fields but message has extensions element,
-      // it means all fields after a certain point are extensions (legacy format)
-      if (!extensionMarkerFound && messageData.extensions !== undefined) {
-        // For legacy XML format without explicit extensions field marker,
-        // we need to use a heuristic based on MAVLink v1 payload limit
-        // This is a fallback for older message definitions
+      // Fallback: If extensions element exists but we couldn't parse the raw XML,
+      // use payload size heuristic to determine extensions
+      if (hasExtensionsElement && extensionFieldNames.size === 0) {
         let corePayloadSize = 0
         const maxV1PayloadSize = 255 // MAVLink v1 maximum payload size
 
@@ -234,6 +237,51 @@ export class XMLParser {
     }
 
     return messageDef
+  }
+
+  /**
+   * Parse raw XML content to find which fields are extensions by locating the <extensions/> marker
+   */
+  private findExtensionFields(messageName: string, rawXmlContent: string): Set<string> {
+    const extensionFields = new Set<string>()
+
+    try {
+      // Find the message definition in the raw XML
+      const messageRegex = new RegExp(
+        `<message[^>]*name="${messageName}"[^>]*>([\\s\\S]*?)</message>`,
+        'i'
+      )
+      const messageMatch = rawXmlContent.match(messageRegex)
+
+      if (!messageMatch) {
+        return extensionFields
+      }
+
+      const messageContent = messageMatch[1]
+
+      // Find the position of the <extensions/> marker
+      const extensionsMatch = messageContent.match(/<extensions\s*\/?>/)
+
+      if (!extensionsMatch) {
+        return extensionFields
+      }
+
+      // Get content after the extensions marker
+      const extensionsIndex = extensionsMatch.index! + extensionsMatch[0].length
+      const afterExtensions = messageContent.substring(extensionsIndex)
+
+      // Find all field names after the extensions marker
+      const fieldRegex = /<field[^>]*name="([^"]+)"/g
+      let fieldMatch
+
+      while ((fieldMatch = fieldRegex.exec(afterExtensions)) !== null) {
+        extensionFields.add(fieldMatch[1])
+      }
+    } catch (error) {
+      console.warn(`Warning: Failed to parse extension fields for message ${messageName}:`, error)
+    }
+
+    return extensionFields
   }
 
   reset(): void {
