@@ -1,35 +1,35 @@
-import { MAVLinkGenerator, generateTypesFromXML } from '../../src/generator/generator';
-import { GenerationOptions } from '../../src/types';
-import { promises as fs } from 'fs';
+import { MAVLinkGenerator, generateTypesFromXML } from '../../src/generator/generator'
+import { GenerationOptions } from '../../src/types'
+import { promises as fs } from 'fs'
 
 // Mock the file system
 jest.mock('fs', () => ({
   promises: {
     mkdir: jest.fn(),
     writeFile: jest.fn(),
-    readFile: jest.fn()
-  }
-}));
+    readFile: jest.fn(),
+  },
+}))
 
 // Mock node-fetch
 jest.mock('node-fetch', () => ({
   __esModule: true,
-  default: jest.fn()
-}));
+  default: jest.fn(),
+}))
 
 describe('MAVLinkGenerator', () => {
-  let generator: MAVLinkGenerator;
+  let generator: MAVLinkGenerator
   const mockOptions: GenerationOptions = {
     dialectName: 'test',
     outputFormat: 'separate',
     includeEnums: true,
-    includeTypeGuards: true
-  };
+    includeTypeGuards: true,
+  }
 
   beforeEach(() => {
-    generator = new MAVLinkGenerator();
-    jest.clearAllMocks();
-  });
+    generator = new MAVLinkGenerator()
+    jest.clearAllMocks()
+  })
 
   describe('generateFromFile', () => {
     const mockXMLContent = `<?xml version="1.0"?>
@@ -46,45 +46,45 @@ describe('MAVLinkGenerator', () => {
       <field type="uint8_t" name="type"/>
     </message>
   </messages>
-</mavlink>`;
+</mavlink>`
 
     beforeEach(() => {
-      (fs.readFile as jest.Mock).mockResolvedValue(mockXMLContent);
-      (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
-      (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
-    });
+      ;(fs.readFile as jest.Mock).mockResolvedValue(mockXMLContent)
+      ;(fs.mkdir as jest.Mock).mockResolvedValue(undefined)
+      ;(fs.writeFile as jest.Mock).mockResolvedValue(undefined)
+    })
 
     it('should generate files from XML file', async () => {
-      await generator.generateFromFile('test.xml', './output', mockOptions);
-      
-      expect(fs.readFile).toHaveBeenCalledWith('test.xml', 'utf-8');
-      expect(fs.mkdir).toHaveBeenCalledWith('./output', { recursive: true });
-      expect(fs.writeFile).toHaveBeenCalledTimes(5); // types, enums, messages, index + dist decoder
-    });
+      await generator.generateFromFile('test.xml', './output', mockOptions)
+
+      expect(fs.readFile).toHaveBeenCalledWith('test.xml', 'utf-8')
+      expect(fs.mkdir).toHaveBeenCalledWith('./output', { recursive: true })
+      expect(fs.writeFile).toHaveBeenCalledTimes(5) // types, enums, messages, index + dist decoder
+    })
 
     it('should generate single file when specified', async () => {
-      const singleFileOptions = { ...mockOptions, outputFormat: 'single' as const };
-      
-      await generator.generateFromFile('test.xml', './output', singleFileOptions);
-      
-      expect(fs.writeFile).toHaveBeenCalledTimes(2); // index file + dist decoder
+      const singleFileOptions = { ...mockOptions, outputFormat: 'single' as const }
+
+      await generator.generateFromFile('test.xml', './output', singleFileOptions)
+
+      expect(fs.writeFile).toHaveBeenCalledTimes(2) // index file + dist decoder
       expect(fs.writeFile).toHaveBeenCalledWith(
         expect.stringContaining('index.ts'),
         expect.any(String)
-      );
-    });
+      )
+    })
 
     it('should skip enums when disabled', async () => {
-      const noEnumsOptions = { ...mockOptions, includeEnums: false };
-      
-      await generator.generateFromFile('test.xml', './output', noEnumsOptions);
-      
-      expect(fs.writeFile).toHaveBeenCalledTimes(4); // types, messages, index + dist decoder (no enums)
-    });
-  });
+      const noEnumsOptions = { ...mockOptions, includeEnums: false }
+
+      await generator.generateFromFile('test.xml', './output', noEnumsOptions)
+
+      expect(fs.writeFile).toHaveBeenCalledTimes(4) // types, messages, index + dist decoder (no enums)
+    })
+  })
 
   describe('generateFromURL', () => {
-    const mockFetch = require('node-fetch').default as jest.Mock;
+    const mockFetch = require('node-fetch').default as jest.Mock
     const mockXMLContent = `<?xml version="1.0"?>
 <mavlink>
   <version>3</version>
@@ -93,57 +93,57 @@ describe('MAVLinkGenerator', () => {
       <field type="uint8_t" name="type"/>
     </message>
   </messages>
-</mavlink>`;
+</mavlink>`
 
     beforeEach(() => {
       mockFetch.mockResolvedValue({
         ok: true,
-        text: () => Promise.resolve(mockXMLContent)
-      });
-      (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
-      (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
-    });
+        text: () => Promise.resolve(mockXMLContent),
+      })
+      ;(fs.mkdir as jest.Mock).mockResolvedValue(undefined)
+      ;(fs.writeFile as jest.Mock).mockResolvedValue(undefined)
+    })
 
     it('should generate files from URL', async () => {
-      await generator.generateFromURL('https://example.com/test.xml', './output', mockOptions);
-      
-      expect(mockFetch).toHaveBeenCalledWith('https://example.com/test.xml');
-      expect(fs.mkdir).toHaveBeenCalledWith('./output', { recursive: true });
-      expect(fs.writeFile).toHaveBeenCalled();
-    });
+      await generator.generateFromURL('https://example.com/test.xml', './output', mockOptions)
+
+      expect(mockFetch).toHaveBeenCalledWith('https://example.com/test.xml')
+      expect(fs.mkdir).toHaveBeenCalledWith('./output', { recursive: true })
+      expect(fs.writeFile).toHaveBeenCalled()
+    })
 
     it('should handle fetch errors', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
-        statusText: 'Not Found'
-      });
-      
+        statusText: 'Not Found',
+      })
+
       await expect(
         generator.generateFromURL('https://example.com/test.xml', './output', mockOptions)
-      ).rejects.toThrow('Failed to fetch');
-    });
-  });
+      ).rejects.toThrow('Failed to fetch')
+    })
+  })
 
   describe('error handling', () => {
     beforeEach(() => {
-      (fs.readFile as jest.Mock).mockResolvedValue('invalid xml content');
-    });
+      ;(fs.readFile as jest.Mock).mockResolvedValue('invalid xml content')
+    })
 
     it('should handle invalid XML gracefully', async () => {
       await expect(
         generator.generateFromFile('invalid.xml', './output', mockOptions)
-      ).rejects.toThrow();
-    });
+      ).rejects.toThrow()
+    })
 
     it('should handle file system errors', async () => {
-      (fs.readFile as jest.Mock).mockRejectedValue(new Error('File not found'));
-      
+      ;(fs.readFile as jest.Mock).mockRejectedValue(new Error('File not found'))
+
       await expect(
         generator.generateFromFile('nonexistent.xml', './output', mockOptions)
-      ).rejects.toThrow('File not found');
-    });
-  });
-});
+      ).rejects.toThrow('File not found')
+    })
+  })
+})
 
 describe('generateTypesFromXML', () => {
   const mockXMLContent = `<?xml version="1.0"?>
@@ -159,40 +159,38 @@ describe('generateTypesFromXML', () => {
       <field type="uint8_t" name="type"/>
     </message>
   </messages>
-</mavlink>`;
+</mavlink>`
 
   const mockOptions: GenerationOptions = {
     dialectName: 'test',
     outputFormat: 'separate',
     includeEnums: true,
-    includeTypeGuards: true
-  };
+    includeTypeGuards: true,
+  }
 
   it('should generate TypeScript from XML string', async () => {
-    const result = await generateTypesFromXML(mockXMLContent, mockOptions);
-    
-    expect(result).toBeDefined();
-    expect(typeof result).toBe('object');
-    expect(result['types.ts']).toBeDefined();
-    expect(result['enums.ts']).toBeDefined();
-    expect(result['messages.ts']).toBeDefined();
-    expect(result['index.ts']).toBeDefined();
-  });
+    const result = await generateTypesFromXML(mockXMLContent, mockOptions)
+
+    expect(result).toBeDefined()
+    expect(typeof result).toBe('object')
+    expect(result['types.ts']).toBeDefined()
+    expect(result['enums.ts']).toBeDefined()
+    expect(result['messages.ts']).toBeDefined()
+    expect(result['index.ts']).toBeDefined()
+  })
 
   it('should generate single file when specified', async () => {
-    const singleFileOptions = { ...mockOptions, outputFormat: 'single' as const };
-    const result = await generateTypesFromXML(mockXMLContent, singleFileOptions);
-    
-    expect(result).toBeDefined();
-    expect(result['index.ts']).toBeDefined();
-    expect(Object.keys(result)).toHaveLength(1);
-  });
+    const singleFileOptions = { ...mockOptions, outputFormat: 'single' as const }
+    const result = await generateTypesFromXML(mockXMLContent, singleFileOptions)
+
+    expect(result).toBeDefined()
+    expect(result['index.ts']).toBeDefined()
+    expect(Object.keys(result)).toHaveLength(1)
+  })
 
   it('should handle invalid XML', async () => {
-    const invalidXML = '<invalid><xml></invalid>';
-    
-    await expect(
-      generateTypesFromXML(invalidXML, mockOptions)
-    ).rejects.toThrow();
-  });
-});
+    const invalidXML = '<invalid><xml></invalid>'
+
+    await expect(generateTypesFromXML(invalidXML, mockOptions)).rejects.toThrow()
+  })
+})

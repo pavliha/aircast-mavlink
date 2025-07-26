@@ -4,7 +4,12 @@
  */
 
 export interface MessageOverrides {
-  [key: string]: any
+  message_name?: string
+  system_id?: number
+  component_id?: number
+  sequence?: number
+  payload?: Record<string, unknown>
+  [key: string]: unknown
 }
 
 export const testMessages = {
@@ -23,7 +28,7 @@ export const testMessages = {
       custom_mode: 12345,
       system_status: 4,
       mavlink_version: 3,
-      ...overrides.payload,
+      ...(overrides.payload || {}),
     },
     ...overrides,
   }),
@@ -50,7 +55,7 @@ export const testMessages = {
       errors_count2: 0,
       errors_count3: 0,
       errors_count4: 0,
-      ...overrides.payload,
+      ...(overrides.payload || {}),
     },
     ...overrides,
   }),
@@ -74,7 +79,7 @@ export const testMessages = {
       vel: 1250,
       cog: 18500,
       satellites_visible: 12,
-      ...overrides.payload,
+      ...(overrides.payload || {}),
     },
     ...overrides,
   }),
@@ -90,7 +95,7 @@ export const testMessages = {
     payload: {
       severity: 6,
       text,
-      ...overrides.payload,
+      ...(overrides.payload || {}),
     },
     ...overrides,
   }),
@@ -113,7 +118,7 @@ export const testMessages = {
       vy: -32768,
       vz: -32768,
       hdg: 36000,
-      ...overrides.payload,
+      ...(overrides.payload || {}),
     },
     ...overrides,
   }),
@@ -134,7 +139,7 @@ export const testMessages = {
       rollspeed: 0.01,
       pitchspeed: -0.02,
       yawspeed: 0.03,
-      ...overrides.payload,
+      ...(overrides.payload || {}),
     },
     ...overrides,
   }),
@@ -169,7 +174,7 @@ export const testMessages = {
       chan17_raw: 0,
       chan18_raw: 0,
       rssi: 255,
-      ...overrides.payload,
+      ...(overrides.payload || {}),
     },
     ...overrides,
   }),
@@ -186,7 +191,7 @@ export const testMessages = {
       brkval: 0, // Default values as per serializer behavior
       freemem: 0,
       freemem32: 0,
-      ...overrides.payload,
+      ...(overrides.payload || {}),
     },
     ...overrides,
   }),
@@ -212,7 +217,7 @@ export const testMessages = {
       accel_cal_x: 0,
       accel_cal_y: 0,
       accel_cal_z: 0,
-      ...overrides.payload,
+      ...(overrides.payload || {}),
     },
     ...overrides,
   }),
